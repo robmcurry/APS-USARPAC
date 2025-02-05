@@ -58,7 +58,7 @@ def build_min_unmet_demand_model(num_locations, num_commodities, num_time_period
                       initialize={(i, c): round(random.uniform(1, 3), 0) for i in model.V for c in model.C})
 
     ###Upper bound on the number of potential APS locations
-    model.P = Param(initialize=4)
+    model.P = Param(initialize=5)
 
     # Maximum allowable risk
     model.R = Param(initialize=50000)
