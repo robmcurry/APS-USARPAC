@@ -617,8 +617,8 @@ def build_multiobjective_model(num_locations, num_commodities, num_time_periods,
 
 def main():
 
-    num_locations = 40
-    num_commodities = 120
+    num_locations = 10
+    num_commodities = 10
     num_time_periods = 10
     num_APS_locations = 6
     
