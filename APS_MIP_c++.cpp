@@ -43,10 +43,10 @@ int main() {
         GRBModel model = GRBModel(env);
 
         // Problem dimensions
-        int num_locations = 10;  // Example
-        int num_commodities = 5;
-        int num_time_periods = 3;
-        int num_APS_locations = 3;
+        int num_locations = 80;  // Example
+        int num_commodities = 50;
+        int num_time_periods = 60;
+        int num_APS_locations = 20;
 
         // Sets
         vector<int> V(num_locations);
@@ -74,14 +74,26 @@ int main() {
         std::map<std::array<int, 2>, double> M, r3, ell, Mt,d;  // Replaces tuple<int, int>
         std::map<std::array<int, 3>, double> r2;  // Replaces tuple<int, int, int>
         map<int, double> b, L;
+        
+        map<array<int, 3>, GRBVar> y, z, w;  // Replaces tuple<int, int, int>
+        map<array<int, 4>, GRBVar> x;
+        map<array<int, 2>, GRBVar>s_var, p_var;
+        map<int, GRBVar> q_var;
+        
         srand(static_cast<unsigned int>(time(0)));
         for (int i : V) {
+            q_var[i] = model.addVar(0, 1, 0, GRB_BINARY);
             for (int c : C) {
                 for (int t : T) {
                     array<int, 3> key = {i, c, t};
                     p[key] = rand() % 41 + 10;
                     m[key] = rand() % 1 + 5;
                     r2[key] = rand() % 5 + 1;
+                    
+                    array<int, 3> key3 = {i, c, t};
+                    y[key3] = model.addVar(0, GRB_INFINITY, 0, GRB_INTEGER);
+                    z[key3] = model.addVar(0, GRB_INFINITY, 0, GRB_INTEGER);
+                    w[key3] = model.addVar(0, GRB_INFINITY, 0, GRB_INTEGER);
                 }
                 
                 array<int, 2> key2 = {i, c};
@@ -89,33 +101,13 @@ int main() {
                 M[key2] = rand() % 1 + 5;
                 r3[key2] = rand() % 5 + 1;
                 ell[key2] = rand() % 3 + 1;
-            }
-        }
-
-        // Gurobi Variables#include <array>
-//#include <map>
-//#include <grb.h>  // Assuming you're using Gurobi
-
-        map<array<int, 3>, GRBVar> y, z, w;  // Replaces tuple<int, int, int>
-        map<array<int, 4>, GRBVar> x;
-        map<array<int, 2>, GRBVar>s_var, p_var;
-        map<int, GRBVar> q_var;
-
-        for (int i : V) {
-            q_var[i] = model.addVar(0, 1, 0, GRB_BINARY);
-            for (int c : C) {
-                for (int t : T) {
-                    array<int, 3> key3 = {i, c, t};
-                    y[key3] = model.addVar(0, GRB_INFINITY, 0, GRB_INTEGER);
-                    z[key3] = model.addVar(0, GRB_INFINITY, 0, GRB_INTEGER);
-                    w[key3] = model.addVar(0, GRB_INFINITY, 0, GRB_INTEGER);
-                }
                 
                 array<int, 2> key4 = {i, c};
                 s_var[key4] = model.addVar(0, GRB_INFINITY, 0, GRB_INTEGER);
                 p_var[key4] = model.addVar(0, 1, 0, GRB_BINARY);
             }
         }
+
 
         for (auto [i, j] : A) {
             for (int c : C) {
@@ -128,19 +120,22 @@ int main() {
 
         // Objective Function: Minimize Unmet Demand
         GRBLinExpr obj = 0;
-        for (int i : V)
-            for (int c : C)
-                for (int t : T){
-                    array<int, 3> key6 = {i, c, t};
-                    obj += p[key6] * z[key6];
-                }
-
-        model.setObjective(obj, GRB_MINIMIZE);
         
+        // Storage Limits (5)
+            
         // Constraints
         // Demand Satisfaction (1)
         for (int i : V) {
             for (int c : C) {
+                
+                for (int t : T){
+                    array<int, 3> key6 = {i, c, t};
+                    obj += p[key6] * z[key6];
+                    array<int, 3> key16 = {i, c, t};
+                    model.addConstr(w[key16] <= m[key16]);
+                }
+                
+                
                 for (int t = 1; t < num_time_periods;t++ ) {
                     GRBLinExpr lhs = 0;
                     for (int t_prime = 1; t_prime <= t; t_prime++){
@@ -152,22 +147,6 @@ int main() {
                     array<int, 2> key4 = {i,c};
                     model.addConstr(lhs == d[key4]);
                 }
-            }
-        }
-        
-        // Initial Inventory (3)
-        for (int j : V_s) {
-            for (int c : C) {
-                array<int, 3> key6 = {j, c, 0};
-                array<int, 2> key4 = {j,c};
-                model.addConstr(w[key6] == s_var[key4]);
-            }
-        }
-        
-
-        // Flow Balance (10)
-        for (int i : V) {
-            for (int c : C) {
                 for (int t = 1; t < Tminus.size(); ++t) {
                     GRBLinExpr lhs = 0;
                     for (int j : V){
@@ -183,17 +162,24 @@ int main() {
                     lhs += w[key6] - w[key7] + y[key6];
                     model.addConstr(lhs == 0);
                 }
+                
             }
         }
-        cout << endl << "hello" << endl;
         
-        // Storage Limits (5)
-        for (int i : V)
-            for (int c : C)
-                for (int t : T){
-                    array<int, 3> key6 = {i, c, t};
-                    model.addConstr(w[key6] <= m[key6]);
-                }
+        model.setObjective(obj, GRB_MINIMIZE);
+        
+        
+        // Initial Inventory (3)
+        for (int j : V_s) {
+            for (int c : C) {
+                array<int, 3> key6 = {j, c, 0};
+                array<int, 2> key4 = {j,c};
+                model.addConstr(w[key6] == s_var[key4]);
+            }
+        }
+        
+
+        
         // Maximum Capacity on Arcs (6)
         for (auto [i, j] : A)
             for (int c : C)
@@ -228,7 +214,7 @@ int main() {
         for (int i : V)
             for (int c : C)
                 for (int t : T){
-                    
+//                    cout << endl << "hello" << endl;
                     array<int, 3> key6 = {i, c, t};
                     risk += r2[key6] * w[key6];
                 }
@@ -251,11 +237,11 @@ int main() {
                 // Check 'y' variable (amount of commodity c consumed at node i during time t)
                 std::string sVarName = "y_" + std::to_string(i) + "_" + std::to_string(c);
                 double sVarValue = s_var[key6].get(GRB_DoubleAttr_X);  // Get the value of y_ict
-                if (sVarValue > 0) {
-                    std::cout << "Variable: " << sVarName << ", Value: " << sVarValue << std::endl;
-                }
-
-                
+//                if (sVarValue > 0) {
+//                    std::cout << "Variable: " << sVarName << ", Value: " << sVarValue << std::endl;
+//                }
+//
+//
                 for (int t = 0; t < num_time_periods; ++t) {
                     
                     array<int, 3> key6 = {i, c, t};
@@ -264,23 +250,23 @@ int main() {
                     // Check 'y' variable (amount of commodity c consumed at node i during time t)
                     std::string yName = "y_" + std::to_string(i) + "_" + std::to_string(c) + "_" + std::to_string(t);
                     double yValue = y[key6].get(GRB_DoubleAttr_X);  // Get the value of y_ict
-                    if (yValue > 0) {
-                        std::cout << "Variable: " << yName << ", Value: " << yValue << std::endl;
-                    }
+//                    if (yValue > 0) {
+//                        std::cout << "Variable: " << yName << ", Value: " << yValue << std::endl;
+//                    }
 
                     // Check 'z' variable (amount of unmet demand at node i for commodity c at time t)
                     std::string zName = "z_" + std::to_string(i) + "_" + std::to_string(c) + "_" + std::to_string(t);
                     double zValue = z[key6].get(GRB_DoubleAttr_X);  // Get the value of z_ict
-                    if (zValue > 0) {
-                        std::cout << "Variable: " << zName << ", Value: " << zValue << std::endl;
-                    }
+//                    if (zValue > 0) {
+//                        std::cout << "Variable: " << zName << ", Value: " << zValue << std::endl;
+//                    }
 
                     // Check 'w' variable (units of commodity c stored at node i at time t)
                     std::string wName = "w_" + std::to_string(i) + "_" + std::to_string(c) + "_" + std::to_string(t);
                     double wValue = w[key6].get(GRB_DoubleAttr_X);  // Get the value of w_ict
-                    if (wValue > 0) {
-                        std::cout << "Variable: " << wName << ", Value: " << wValue << std::endl;
-                    }
+//                    if (wValue > 0) {
+//                        std::cout << "Variable: " << wName << ", Value: " << wValue << std::endl;
+//                    }
                 }
             }
         }
