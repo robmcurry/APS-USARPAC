@@ -27,14 +27,8 @@
 using namespace std;
 
 
-//struct Key {
-//    int a, b, c;
-//
-//    // Define operator< so it can be used as a key in std::map
-//    bool operator<(const Key& other) const {
-//        return tie(a, b, c) < tie(other.a, other.b, other.c);
-//    }
-//};
+
+
 
 int main() {
     try {
@@ -42,9 +36,10 @@ int main() {
         GRBEnv env = GRBEnv();
         GRBModel model = GRBModel(env);
 
+        auto start = std::chrono::high_resolution_clock::now();
         // Problem dimensions
-        int num_locations = 80;  // Example
-        int num_commodities = 50;
+        int num_locations = 50;  // Example
+        int num_commodities = 20;
         int num_time_periods = 60;
         int num_APS_locations = 20;
 
@@ -67,7 +62,7 @@ int main() {
                 if (i != j) A.emplace_back(i, j);
             }
         }
-
+//        cout << endl << endl << "Hello" << endl << endl;
         // Randomized Parameters (Using Maps)
         map<array<int, 3>, double> p, m;
         std::map<std::array<int, 4>, double> mu, r1;  // Replaces tuple<int, int, int, int>
@@ -80,6 +75,7 @@ int main() {
         map<array<int, 2>, GRBVar>s_var, p_var;
         map<int, GRBVar> q_var;
         
+//        cout << endl << endl << "Hello" << endl << endl;
         srand(static_cast<unsigned int>(time(0)));
         for (int i : V) {
             q_var[i] = model.addVar(0, 1, 0, GRB_BINARY);
@@ -108,7 +104,8 @@ int main() {
             }
         }
 
-
+        
+//        cout << endl << endl << "Hello" << endl << endl;
         for (auto [i, j] : A) {
             for (int c : C) {
                 for (int t : T) {
@@ -117,7 +114,8 @@ int main() {
                 }
             }
         }
-
+        
+//        cout << endl << endl << "Hello" << endl << endl;
         // Objective Function: Minimize Unmet Demand
         GRBLinExpr obj = 0;
         
@@ -166,6 +164,7 @@ int main() {
             }
         }
         
+//        cout << endl << endl << "Hello" << endl << endl;
         model.setObjective(obj, GRB_MINIMIZE);
         
         
@@ -178,7 +177,8 @@ int main() {
             }
         }
         
-
+        
+//        cout << endl << endl << "Hello" << endl << endl;
         
         // Maximum Capacity on Arcs (6)
         for (auto [i, j] : A)
@@ -219,59 +219,99 @@ int main() {
                     risk += r2[key6] * w[key6];
                 }
         model.addConstr(risk <= 50000);
+        
 
-        cout << endl << "hello" << endl;
-        // Solve Model
-        model.optimize();
+        
+    
+        for (int num_runs = 0; num_runs < 5; num_runs++) {
+            
+            
+            // Solve Model
+            model.optimize();
 
-        // Print Results
-        cout << "Objective Value: " << model.get(GRB_DoubleAttr_ObjVal) << endl;
-        // Get the number of variables in the model
-        // Example: Loop through 'x', 'y', 'z', and 'w' variables, checking for positive values
-        for (int i = 0; i < num_locations; ++i) {
-            for (int c = 0; c < num_commodities; ++c) {
-                
-                array<int, 2> key6 = {i, c};
-               
+            // Print Results
+            cout << "Objective Value: " << model.get(GRB_DoubleAttr_ObjVal) << endl;
+            // Get the number of variables in the model
+            // Example: Loop through 'x', 'y', 'z', and 'w' variables, checking for positive values
+            for (int i = 0; i < num_locations; ++i) {
+                for (int c = 0; c < num_commodities; ++c) {
 
-                // Check 'y' variable (amount of commodity c consumed at node i during time t)
-                std::string sVarName = "y_" + std::to_string(i) + "_" + std::to_string(c);
-                double sVarValue = s_var[key6].get(GRB_DoubleAttr_X);  // Get the value of y_ict
-//                if (sVarValue > 0) {
-//                    std::cout << "Variable: " << sVarName << ", Value: " << sVarValue << std::endl;
-//                }
-//
-//
-                for (int t = 0; t < num_time_periods; ++t) {
-                    
-                    array<int, 3> key6 = {i, c, t};
-                   
+                    array<int, 2> key6 = {i, c};
+
 
                     // Check 'y' variable (amount of commodity c consumed at node i during time t)
-                    std::string yName = "y_" + std::to_string(i) + "_" + std::to_string(c) + "_" + std::to_string(t);
-                    double yValue = y[key6].get(GRB_DoubleAttr_X);  // Get the value of y_ict
-//                    if (yValue > 0) {
-//                        std::cout << "Variable: " << yName << ", Value: " << yValue << std::endl;
-//                    }
+                    std::string sVarName = "y_" + std::to_string(i) + "_" + std::to_string(c);
+                    double sVarValue = s_var[key6].get(GRB_DoubleAttr_X);  // Get the value of y_ict
+    //                if (sVarValue > 0) {
+    //                    std::cout << "Variable: " << sVarName << ", Value: " << sVarValue << std::endl;
+    //                }
+    //
+    //
+                    for (int t = 0; t < num_time_periods; ++t) {
 
-                    // Check 'z' variable (amount of unmet demand at node i for commodity c at time t)
-                    std::string zName = "z_" + std::to_string(i) + "_" + std::to_string(c) + "_" + std::to_string(t);
-                    double zValue = z[key6].get(GRB_DoubleAttr_X);  // Get the value of z_ict
-//                    if (zValue > 0) {
-//                        std::cout << "Variable: " << zName << ", Value: " << zValue << std::endl;
-//                    }
+                        array<int, 3> key6 = {i, c, t};
 
-                    // Check 'w' variable (units of commodity c stored at node i at time t)
-                    std::string wName = "w_" + std::to_string(i) + "_" + std::to_string(c) + "_" + std::to_string(t);
-                    double wValue = w[key6].get(GRB_DoubleAttr_X);  // Get the value of w_ict
-//                    if (wValue > 0) {
-//                        std::cout << "Variable: " << wName << ", Value: " << wValue << std::endl;
-//                    }
+
+                        // Check 'y' variable (amount of commodity c consumed at node i during time t)
+                        std::string yName = "y_" + std::to_string(i) + "_" + std::to_string(c) + "_" + std::to_string(t);
+                        double yValue = y[key6].get(GRB_DoubleAttr_X);  // Get the value of y_ict
+    //                    if (yValue > 0) {
+    //                        std::cout << "Variable: " << yName << ", Value: " << yValue << std::endl;
+    //                    }
+
+                        // Check 'z' variable (amount of unmet demand at node i for commodity c at time t)
+                        std::string zName = "z_" + std::to_string(i) + "_" + std::to_string(c) + "_" + std::to_string(t);
+                        double zValue = z[key6].get(GRB_DoubleAttr_X);  // Get the value of z_ict
+    //                    if (zValue > 0) {
+    //                        std::cout << "Variable: " << zName << ", Value: " << zValue << std::endl;
+    //                    }
+
+                        // Check 'w' variable (units of commodity c stored at node i at time t)
+                        std::string wName = "w_" + std::to_string(i) + "_" + std::to_string(c) + "_" + std::to_string(t);
+                        double wValue = w[key6].get(GRB_DoubleAttr_X);  // Get the value of w_ict
+    //                    if (wValue > 0) {
+    //                        std::cout << "Variable: " << wName << ", Value: " << wValue << std::endl;
+    //                    }
+                    }
                 }
             }
+
+            
+            
+            
+            model.reset();
+            srand(static_cast<unsigned int>(time(0)));
+            
+            
+            for (int i : V) {
+                for (int c : C) {
+                    for (int t : T) {
+                        
+                        array<int, 3> key = {i, c, t};
+                        p[key] = rand() % 41 + 10;
+                        m[key] = rand() % 1 + 5;
+                        r2[key] = rand() % 5 + 1;
+                        
+                    }
+                    
+                    array<int, 2> key2 = {i, c};
+                    d[key2] = rand() % 71 + 30;
+                    M[key2] = rand() % 1 + 5;
+                    r3[key2] = rand() % 5 + 1;
+                    ell[key2] = rand() % 3 + 1;
+                    
+                }
+            }
+            
         }
+        
+        
+        
+        auto end = std::chrono::high_resolution_clock::now();
+           std::chrono::duration<double> elapsed = end - start;
 
-
+        
+           std::cout << "Elapsed time: " << elapsed.count() << " seconds\n";
     } catch (GRBException e) {
         cout << "Gurobi Error: " << e.getMessage() << endl;
     }
