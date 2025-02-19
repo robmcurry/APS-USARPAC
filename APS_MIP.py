@@ -1,7 +1,5 @@
 from pyomo.environ import *
 import random
-
-
 def build_min_unmet_demand_model(num_locations, num_commodities, num_time_periods, num_APS_locations, num_modes=3):
     # Create a model
     
@@ -183,31 +181,31 @@ def build_min_unmet_demand_model(num_locations, num_commodities, num_time_period
     model.constraint10_91 = Constraint(rule=constraint10_91)
 
 
+    
 
     # Solve the model
     solver = SolverFactory('gurobi')  # or another solver
     results = solver.solve(model)
 
-    print(results)
-        
-#    for c in model.C:
-#        for i in model.V:
-#            for j in model.V:
-#                for t in model.T:
-#                    if i!=j:
-#                        if model.x[i,j,c,t].value > 0:
-#                            print("commodity ",c," flow on arc (",i,",",j,") during time period ", t," is ", model.x[i,j,c,t].value)
+    # Output the values of the variables
+    for c in model.C:
+        for i in model.V:
+            for j in model.V:
+                for t in model.T:
+                    if i != j and model.x[i, j, c, t].value > 0:
+                        print(
+                            f"Commodity {c} flow on arc ({i}, {j}) during time period {t}: {model.x[i, j, c, t].value}")
 
-    #for i in model.V:
-    #    for c in model.C:
-    #        for t in model.T:
-    #            if model.y[i,c,t].value > 0:
-    #                print("commodity ",c," consumed by node (",i,") at the end of time period ", t," is ", model.y[i,c,t].value)
-#    for c in model.C:
-#        for i in model.V:
-#            if model.s_var[i,c].value > 0:
-#                    print("commodity ",c," prepositioned at (",i,") is ", model.s_var[i,c].value)
+    for i in model.V:
+        for c in model.C:
+            for t in model.T:
+                if model.y[i, c, t].value > 0:
+                    print(f"Commodity {c} consumed by node {i} at end of time period {t}: {model.y[i, c, t].value}")
 
+    for c in model.C:
+        for i in model.V:
+            if model.s_var[i, c].value > 0:
+                print(f"Commodity {c} pre-positioned at node {i}: {model.s_var[i, c].value}")
 
 
 def build_risk_model(num_locations, num_commodities, num_time_periods, num_APS_locations):
@@ -223,7 +221,8 @@ def build_risk_model(num_locations, num_commodities, num_time_periods, num_APS_l
     model.A = Set(within=model.V * model.V,
                   initialize=[(i, j) for i in model.V for j in model.V if i != j])  # Fully connected DAG (Directed Acylic Graph
     model.V_s = Set(initialize=range(1, num_APS_locations))  # More special nodes
-    model.M = Set(initialize=range(1, num_modes))  # Set containing mode IDs
+    # model.M = Set(initialize=range(1, num_modes))  # Set containing mode IDs
+
 
     ###penalty for a unit of unmet demand at node i for commodity c at the end of time period t
     model.p = Param(model.V, model.C, model.T,
@@ -395,26 +394,66 @@ def build_risk_model(num_locations, num_commodities, num_time_periods, num_APS_l
     results = solver.solve(model)
 
     print(results)
-        
-#    for c in model.C:
-#        for i in model.V:
-#            for j in model.V:
-#                for t in model.T:
-#                    if i!=j:
-#                        if model.x[i,j,c,t].value > 0:
-#                            print("commodity ",c," flow on arc (",i,",",j,") during time period ", t," is ", model.x[i,j,c,t].value)
 
-    #for i in model.V:
-    #    for c in model.C:
-    #        for t in model.T:
-    #            if model.y[i,c,t].value > 0:
-    #                print("commodity ",c," consumed by node (",i,") at the end of time period ", t," is ", model.y[i,c,t].value)
-#    for c in model.C:
-#        for i in model.V:
-#            if model.s_var[i,c].value > 0:
-#                    print("commodity ",c," prepositioned at (",i,") is ", model.s_var[i,c].value)
+    # Output the values of the variables
+    for c in model.C:
+        for i in model.V:
+            for j in model.V:
+                for t in model.T:
+                    if i != j and model.x[i, j, c, t].value > 0:
+                        print(
+                            f"Commodity {c} flow on arc ({i}, {j}) during time period {t}: {model.x[i, j, c, t].value}")
 
-def build_multiobjective_model(num_locations, num_commodities, num_time_periods, num_APS_locations):
+    for i in model.V:
+        for c in model.C:
+            for t in model.T:
+                if model.y[i, c, t].value > 0:
+                    print(f"Commodity {c} consumed by node {i} at end of time period {t}: {model.y[i, c, t].value}")
+
+    for c in model.C:
+        for i in model.V:
+            if model.s_var[i, c].value > 0:
+                print(f"Commodity {c} pre-positioned at node {i}: {model.s_var[i, c].value}")
+    print(results)
+
+    # Output the values of the variables
+    for c in model.C:
+        for i in model.V:
+            for j in model.V:
+                for t in model.T:
+                    if i != j and model.x[i, j, c, t].value > 0:
+                        print(
+                            f"Commodity {c} flow on arc ({i}, {j}) during time period {t}: {model.x[i, j, c, t].value}")
+
+    for i in model.V:
+        for c in model.C:
+            for t in model.T:
+                if model.y[i, c, t].value > 0:
+                    print(f"Commodity {c} consumed by node {i} at end of time period {t}: {model.y[i, c, t].value}")
+
+    for c in model.C:
+        for i in model.V:
+            if model.s_var[i, c].value > 0:
+                print(f"Commodity {c} pre-positioned at node {i}: {model.s_var[i, c].value}")
+
+
+def main():
+
+    num_locations = 30
+    num_commodities = 20
+    num_time_periods = 20
+    num_APS_locations = 6
+    num_modes = 2
+
+    #build_min_unmet_demand_model(num_locations, num_commodities, num_time_periods, num_APS_locations)
+
+#    build_risk_model(num_locations, num_commodities, num_time_periods, num_APS_locations)
+
+    build_multiobjective_model(num_locations, num_commodities, num_time_periods, num_APS_locations, num_modes)
+
+
+def build_multiobjective_model(num_locations, num_commodities, num_time_periods, num_APS_locations,
+                               num_modes):
     # Create a model
     model = ConcreteModel()
 
@@ -424,8 +463,12 @@ def build_multiobjective_model(num_locations, num_commodities, num_time_periods,
     model.C = Set(initialize=range(1, num_commodities))  # Total Commodities
     model.T = Set(initialize=range(num_time_periods))  # Total Time periods
     model.Tminus = Set(initialize=range(1, num_time_periods))  # Time periods without 0
+    # Set containing mode IDs, representing different modes of transportation
+    model.M = Set(initialize=range(1, num_modes))  # Modes of transportation (1 to num_modes)
+    #model.IndexedSetM = Set(model.M,initialize=lambda model, m: range(m * 10, (m + 1) * 10))  # Indexed set of sets based on M
     model.A = Set(within=model.V * model.V,
                   initialize=[(i, j) for i in model.V for j in model.V if i != j])  # Fully connected DAG (Directed Acylic Graph
+    
     model.V_s = Set(initialize=range(1, num_APS_locations))  # More special nodes
 
     ###penalty for a unit of unmet demand at node i for commodity c at the end of time period t
@@ -439,19 +482,19 @@ def build_multiobjective_model(num_locations, num_commodities, num_time_periods,
     ###maximum allowable allocation for commodity c at node i and time t
     model.m = Param(model.V, model.C, model.T,
                     initialize={(i, c, t): random.randint(50, 100) for i in model.V for c in model.C for t in model.T})
-                    
+
     ###maximum capacity of arc (i,j) for commodity c during time t
-    model.mu = Param(model.A, model.C, model.T,
-                     initialize={(i, j, c, t): random.randint(0, 10) for (i, j) in model.A for c in model.C for t in model.T})
+    model.mu = Param(model.A, model.C, model.T, model.M,
+                     initialize={(i, j, c, t,m): random.randint(1, 10) for (i, j) in model.A for c in model.C for t in model.T for m in model.M})
 
     ###Maximum allowable space for commodity c at node i
-    model.M = Param(model.V, model.C,
+    model.MM = Param(model.V, model.C,
                     initialize={(i, c): random.randint(5000, 7000) for i in model.V for c in model.C})
-                    
+
     ###Maximum allowable space among all commodities during time t
     model.Mt = Param(model.V, model.T,
                     initialize={(i, t): random.randint(10, 20) for i in model.V for t in model.T})
-                    
+
     ###The unit risk associated with sending commodity c on arc (i,j) during time t
     model.r1 = Param(model.A, model.C, model.T,
                      initialize={(i, j, c, t): random.randint(1, 5) for (i, j) in model.A for c in model.C for t in model.T})
@@ -481,7 +524,6 @@ def build_multiobjective_model(num_locations, num_commodities, num_time_periods,
     model.L = Param(model.C, initialize={c: random.randint(1, 2) for c in model.C})
 
     # Define variables
-
     ##The amount of commodity c consumed to meet demand at node i in V
     ##at the end of time t
     model.y = Var(model.V, model.C, model.T, within=NonNegativeIntegers)  # y_ict
@@ -490,26 +532,38 @@ def build_multiobjective_model(num_locations, num_commodities, num_time_periods,
     model.z = Var(model.V, model.C, model.T, within=NonNegativeIntegers)  # z_ict
 
     ##the units of flow on arc (i,j) for commodity c during time t
-    model.x = Var(model.A, model.C, model.T, within=NonNegativeReals)  # x_ijct
+    model.x = Var(model.A, model.C, model.T, model.M, within=NonNegativeReals)  # x_ijctm
 
     ##The units of commodity c stored at node i at the end of time period t
     model.w = Var(model.V, model.C, model.T, within=NonNegativeIntegers)  # w_ict
 
+    ##The units of transport mode m stored at node i at the end of time period t
+    model.wbar = Var(model.V, model.M, model.T, within=NonNegativeIntegers)  # w_ict
+
     ##the units of units of commodity c pre-positioned at node i
     model.s_var = Var(model.V, model.C, within=NonNegativeIntegers)  # s_ic
+
+    ##the units of units of commodity c pre-positioned at node i
+    model.s_varbar = Var(model.V, model.M, within=NonNegativeIntegers)  # s_ic
 
     ##equals 1 if commodity c is pre positioned at node i
     model.p_var = Var(model.V, model.C, within=Binary)  # p_ic
 
+    ##equals 1 if mode m is pre positioned at node i
+    model.p_varbar = Var(model.V, model.M, within=Binary)  # p_ic
+
     ##equals 1 if node i is pre-positioned with any commodity
     model.q_var = Var(model.V, within=Binary)  # q_i
+
+    ##equals 1 if node i is pre-positioned with any transport mode
+    model.q_varbar = Var(model.V, within=Binary)  # q_i
 
     demand_weight = 0.5
     risk_weight = 0.5
 
     # Objective function
     def objective_function(model):
-        return risk_weight*(sum( sum( sum(model.r1[i, j, c, t] * model.x[i, j, c, t] for (i, j) in model.A) +
+        return risk_weight*(sum(sum( sum( sum(model.r1[i, j, c, t] * model.x[i, j, c, t,m] for (i, j) in model.A) for m in model.M) +
                        sum(model.r2[i, c, t] * model.w[i, c, t] for i in model.V) + sum(model.r3[i, c] * model.s_var[i, c] for i in model.V) for t in model.T) for c in model.C)) + demand_weight*(sum(model.p[i, c, t] * model.z[i, c, t] for i in model.V for c in model.C for t in model.T))
     model.obj = Objective(rule=objective_function, sense=minimize)
 
@@ -540,34 +594,51 @@ def build_multiobjective_model(num_locations, num_commodities, num_time_periods,
 
     ## Constraint (6)
     ##cannot exceed max capacity on arc (i,j)
-    def constraint6(model, i, j, c, t):
-        return model.x[i, j, c, t] <= model.mu[i, j, c, t]
-    model.constraint6 = Constraint(model.A, model.C, model.T, rule=constraint6)
+    def constraint6(model, i, j, c, t, m):
+        return model.x[i, j, c, t, m] <= model.mu[i, j, c, t,m]
+    model.constraint6 = Constraint(model.A, model.C, model.T, model.M, rule=constraint6)
 
     ## Constraint (7)
     ## cannot exceed the total budgeted cost out of i during t
     def constraint7(model, i, t):
-        return sum(model.b[c] * model.w[i, c, t] for c in model.C) <= model.Mt[i, t]
+        return sum(model.b[c] * model.w[i, c, t] for c in model.C) + sum(model.w[i, m, t] for m in model.M) <= model.Mt[i, t]
     model.constraint7 = Constraint(model.V, model.T, rule=constraint7)
 
     ## Constraint (10)
     ## Flow balance constraints
     ## Keeps up with the flow out, the flow in, the demand consumed, and the demand that is stored there between flow periods
     def constraint10(model, i, c, t):
-        return sum(model.x[i, j, c, t] for j in model.V if (i, j) in model.A) - sum(model.x[j, i, c, t] for j in model.V if (j, i) in model.A) + model.w[i, c, t] - model.w[i, c, t-1] + model.y[i, c, t] == 0
+        return sum(sum(model.x[i, j, c, t,m] for j in model.V if (i, j) in model.A) - sum(model.x[j, i, c, t,m] for j in model.V if (j, i) in model.A) for m in model.M) + model.w[i, c, t] - model.w[i, c, t-1] + model.y[i, c, t] == 0
     model.constraint10 = Constraint(model.V, model.C, model.Tminus, rule=constraint10)
+
+    def constraint101(model, i, m, t):
+        return sum(sum(model.x[i, j, c, t,m] for j in model.V if (i, j) in model.A) - sum(model.x[j, i, c, t,m] for j in model.V if (j, i) in model.A) for c in model.C) + model.wbar[i, m, t] - model.wbar[i, m, t-1]  == 0
+    model.constraint101 = Constraint(model.V, model.M, model.Tminus, rule=constraint101)
+
 
     ## Constraint (10.5)
     ##Ensures that if we store commodity c at i then we must have opened that node i for commodity c
     def constraint10_5(model, i, c):
-        return model.s_var[i, c] <= model.M[i, c] * model.p_var[i, c]
+        return model.s_var[i, c] <= model.MM[i, c] * model.p_var[i, c]
     model.constraint10_5 = Constraint(model.V, model.C, rule=constraint10_5)
+
+    ##Ensures that if we store commodity c at i then we must have opened that node i for commodity c
+    def constraint10_51(model, i, m):
+        return model.s_varbar[i, m] <= model.MM[i, 1] * model.p_varbar[i, m]
+    model.constraint10_51 = Constraint(model.V, model.M, rule=constraint10_51)
+
 
     ## Constraint (10.6)
     ##Ensures that if we store commodity c at node i then we must have opened i
     def constraint10_6(model, i, c):
         return model.p_var[i, c] <= model.q_var[i]
     model.constraint10_6 = Constraint(model.V, model.C, rule=constraint10_6)
+
+    ##Ensures that if we store commodity c at node i then we must have opened i
+    def constraint10_61(model, i, m):
+        return model.p_varbar[i, m] <= model.q_varbar[i]
+    model.constraint10_61 = Constraint(model.V, model.M, rule=constraint10_61)
+
 
     ## Constraint (10.7)
     ##Ensures that we don't open more than P number of APSs
@@ -587,50 +658,12 @@ def build_multiobjective_model(num_locations, num_commodities, num_time_periods,
         return model.s_var[i, c] >= model.ell[i, c] * model.p_var[i, c]
     model.constraint10_9 = Constraint(model.V, model.C, rule=constraint10_9)
 
- 
- 
 
     # Solve the model
     solver = SolverFactory('gurobi')  # or another solver
     results = solver.solve(model)
 
     print(results)
-        
-#    for c in model.C:
-#        for i in model.V:
-#            for j in model.V:
-#                for t in model.T:
-#                    if i!=j:
-#                        if model.x[i,j,c,t].value > 0:
-#                            print("commodity ",c," flow on arc (",i,",",j,") during time period ", t," is ", model.x[i,j,c,t].value)
-
-    #for i in model.V:
-    #    for c in model.C:
-    #        for t in model.T:
-    #            if model.y[i,c,t].value > 0:
-    #                print("commodity ",c," consumed by node (",i,") at the end of time period ", t," is ", model.y[i,c,t].value)
-#    for c in model.C:
-#        for i in model.V:
-#            if model.s_var[i,c].value > 0:
-#                    print("commodity ",c," prepositioned at (",i,") is ", model.s_var[i,c].value)
-
-
-
-
-
-
-def main():
-
-    num_locations = 10
-    num_commodities = 10
-    num_time_periods = 10
-    num_APS_locations = 6
-    
-    build_min_unmet_demand_model(num_locations, num_commodities, num_time_periods, num_APS_locations)
-
-    build_risk_model(num_locations, num_commodities, num_time_periods, num_APS_locations)
-
-    build_multiobjective_model(num_locations, num_commodities, num_time_periods, num_APS_locations)
 
 if __name__ == "__main__":
     main()
