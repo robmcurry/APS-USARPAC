@@ -102,15 +102,17 @@ def build_min_unmet_demand_model(num_locations, num_commodities, num_time_period
 
     ###defines the demand constraints here
     # Constraint (1)
-    def constraint1(model, i, c, t):
+    def commodity_demand_balance(model, i, c, t):
         return sum(model.y[i, c, t_prime] for t_prime in model.T if t_prime <= t) + model.z[i, c, t] == model.d[i, c]
-    model.constraint1 = Constraint(model.V, model.C, model.T, rule=constraint1)
+
+    model.commodity_demand_balance = Constraint(model.V, model.C, model.T, rule=commodity_demand_balance)
 
     # Constraint (3)
     #Ensures that the flow from 0 to j in Vs for commodity c is equal to the determined supply of c at j in Vs
     def constraint3(model, j, c):
         return model.w[j, c, 0] == model.s_var[j, c]
-    model.constraint3 = Constraint(model.V_s, model.C, rule=constraint3)
+
+    model.supply_equals_initial_inventory_constraint = Constraint(model.V_s, model.C, rule=constraint3)
 
     ## Constraint (4)
     ##These constraints ensure that the total commodity c leftover is equal to the total flow of c supplied minutes the amount consumed
@@ -163,9 +165,10 @@ def build_min_unmet_demand_model(num_locations, num_commodities, num_time_period
 
     ## Constraint (10.8)
     ## Makes sure that we have at least L units of commodity c among all starting APS locations
-    def constraint10_8(model, c):
+    def minimum_aps_requirement(model, c):
         return sum(model.p_var[i, c] for i in model.V) >= model.L[c]
-    model.constraint10_8 = Constraint(model.C, rule=constraint10_8)
+
+    model.minimum_aps_requirement_constraint = Constraint(model.C, rule=minimum_aps_requirement)
 
     ## Constraint (10.9)
     ## Ensures that if we store commodity c at node i then we must store at least some minimum number
@@ -311,19 +314,23 @@ def build_risk_model(num_locations, num_commodities, num_time_periods, num_APS_l
     # Constraint (1)
     def constraint1(model, i, c, t):
         return sum(model.y[i, c, t_prime] for t_prime in model.T if t_prime <= t) + model.z[i, c, t] >= model.d[i, c]
-    model.constraint1 = Constraint(model.V, model.C, model.T, rule=constraint1)
+
+    model.demand_satisfaction_constraint = Constraint(model.V, model.C, model.T, rule=constraint1)
 
     # Constraint (3)
     #Ensures that the flow from 0 to j in Vs for commodity c is equal to the determined supply of c at j in Vs
-    def constraint3(model, j, c):
+    def initial_inventory_equals_prepositioned_units(model, j, c):
         return model.w[j, c, 0] == model.s_var[j, c]
-    model.constraint3 = Constraint(model.V_s, model.C, rule=constraint3)
+
+    model.initial_inventory_equals_prepositioned_units_constraint = Constraint(model.V_s, model.C,
+                                                                               rule=initial_inventory_equals_prepositioned_units)
 
     ## Constraint (4)
     ##These constraints ensure that the total commodity c leftover is equal to the total flow of c supplied minutes the amount consumed
     def constraint4(model, c):
         return sum(model.w[i, c, model.T.last()] for i in model.V) == sum(model.s_var[j, c] for j in model.V_s) - sum(model.y[i, c, t] for i in model.V for t in model.T)
-    model.constraint4 = Constraint(model.C, rule=constraint4)
+
+    model.flow_balance_at_end_period_constraint = Constraint(model.C, rule=constraint4)
 
     ## Constraint (5)
     #Cannot exced m number of units at node i for commodity c at time t
@@ -341,7 +348,8 @@ def build_risk_model(num_locations, num_commodities, num_time_periods, num_APS_l
     ## cannot exceed the total budgeted cost out of i during t
     def constraint7(model, i, t):
         return sum(model.b[c] * model.w[i, c, t] for c in model.C) <= model.Mt[i, t]
-    model.constraint7 = Constraint(model.V, model.T, rule=constraint7)
+
+    model.total_cost_budget_constraint = Constraint(model.V, model.T, rule=constraint7)
 
     ## Constraint (10)
     ## Flow balance constraints
@@ -354,25 +362,29 @@ def build_risk_model(num_locations, num_commodities, num_time_periods, num_APS_l
     ##Ensures that if we store commodity c at i then we must have opened that node i for commodity c
     def constraint10_5(model, i, c):
         return model.s_var[i, c] <= model.M[i, c] * model.p_var[i, c]
-    model.constraint10_5 = Constraint(model.V, model.C, rule=constraint10_5)
+
+    model.storage_opening_cost_constraint = Constraint(model.V, model.C, rule=constraint10_5)
 
     ## Constraint (10.6)
     ##Ensures that if we store commodity c at node i then we must have opened i
     def constraint10_6(model, i, c):
         return model.p_var[i, c] <= model.q_var[i]
-    model.constraint10_6 = Constraint(model.V, model.C, rule=constraint10_6)
+
+    model.commodity_opening_dependency_constraint = Constraint(model.V, model.C, rule=constraint10_6)
 
     ## Constraint (10.7)
     ##Ensures that we don't open more than P number of APSs
     def constraint10_7(model):
         return sum(model.q_var[i] for i in model.V) <= model.P
-    model.constraint10_7 = Constraint(rule=constraint10_7)
+
+    model.aps_location_limit_constraint = Constraint(rule=constraint10_7)
 
     ## Constraint (10.8)
     ## Makes sure that we have at least L units of commodity c among all starting APS locations
     def constraint10_8(model, c):
         return sum(model.p_var[i, c] for i in model.V) >= model.L[c]
-    model.constraint10_8 = Constraint(model.C, rule=constraint10_8)
+
+    model.commodity_minimum_aps_constraint = Constraint(model.C, rule=constraint10_8)
 
     ## Constraint (10.9)
     ## Ensures that if we store commodity c at node i then we must store at least some minimum number
@@ -439,16 +451,16 @@ def build_risk_model(num_locations, num_commodities, num_time_periods, num_APS_l
 
 def main():
 
-    num_locations = 30
-    num_commodities = 20
-    num_time_periods = 20
+    num_locations = 10
+    num_commodities = 10
+    num_time_periods = 10
     num_APS_locations = 6
     num_modes = 2
 
 
     #build_min_unmet_demand_model(num_locations, num_commodities, num_time_periods, num_APS_locations)
 
-#    build_risk_model(num_locations, num_commodities, num_time_periods, num_APS_locations)
+    #build_risk_model(num_locations, num_commodities, num_time_periods, num_APS_locations)
 
     build_multiobjective_model(num_locations, num_commodities, num_time_periods, num_APS_locations, num_modes)
 
@@ -563,102 +575,143 @@ def build_multiobjective_model(num_locations, num_commodities, num_time_periods,
     risk_weight = 0.5
 
     # Objective function
-    def objective_function(model):
-        return risk_weight*(sum(sum( sum( sum(model.r1[i, j, c, t] * model.x[i, j, c, t,m] for (i, j) in model.A) for m in model.M) +
-                       sum(model.r2[i, c, t] * model.w[i, c, t] for i in model.V) + sum(model.r3[i, c] * model.s_var[i, c] for i in model.V) for t in model.T) for c in model.C)) + demand_weight*(sum(model.p[i, c, t] * model.z[i, c, t] for i in model.V for c in model.C for t in model.T))
-    model.obj = Objective(rule=objective_function, sense=minimize)
 
+    def combined_risk_and_demand_cost(model):
+        return risk_weight * (
+            sum(sum(sum(sum(model.r1[i, j, c, t] * model.x[i, j, c, t, m] for (i, j) in model.A) for m in model.M) +
+                    sum(model.r2[i, c, t] * model.w[i, c, t] for i in model.V) + sum(
+                model.r3[i, c] * model.s_var[i, c] for i in model.V) for t in model.T) for c in
+                model.C)) + demand_weight * (
+            sum(model.p[i, c, t] * model.z[i, c, t] for i in model.V for c in model.C for t in model.T))
+
+    model.combined_risk_and_demand_objective = Objective(rule=combined_risk_and_demand_cost, sense=minimize)
 
     ###defines the demand constraints here
     # Constraint (1)
-    def constraint1(model, i, c, t):
+    
+    def primary_demand_satisfaction(model, i, c, t):
         return sum(model.y[i, c, t_prime] for t_prime in model.T if t_prime <= t) + model.z[i, c, t] == model.d[i, c]
-    model.constraint1 = Constraint(model.V, model.C, model.T, rule=constraint1)
+
+    model.primary_demand_satisfaction_constraint = Constraint(model.V, model.C, model.T,
+                                                              rule=primary_demand_satisfaction)
 
     # Constraint (3)
     #Ensures that the flow from 0 to j in Vs for commodity c is equal to the determined supply of c at j in Vs
-    def constraint3(model, j, c):
+
+    def prepositioned_inventory_balance(model, j, c):
         return model.w[j, c, 0] == model.s_var[j, c]
-    model.constraint3 = Constraint(model.V_s, model.C, rule=constraint3)
+
+    model.prepositioned_inventory_balance = Constraint(model.V_s, model.C, rule=prepositioned_inventory_balance)
 
     ## Constraint (4)
     ##These constraints ensure that the total commodity c leftover is equal to the total flow of c supplied minutes the amount consumed
-    def constraint4(model, c):
-        return sum(model.w[i, c, model.T.last()] for i in model.V) == sum(model.s_var[j, c] for j in model.V_s) - sum(model.y[i, c, t] for i in model.V for t in model.T)
-    model.constraint4 = Constraint(model.C, rule=constraint4)
+
+    def flow_balance_supply_equals_demand(model, c):
+        return sum(model.w[i, c, model.T.last()] for i in model.V) == sum(model.s_var[j, c] for j in model.V_s) - sum(
+            model.y[i, c, t] for i in model.V for t in model.T)
+
+    model.flow_balance_supply_equals_demand_constraint = Constraint(model.C, rule=flow_balance_supply_equals_demand)
 
     ## Constraint (5)
     #Cannot exced m number of units at node i for commodity c at time t
-    def constraint5(model, i, c, t):
+
+    def max_allocation_limit_function(model, i, c, t):
         return model.w[i, c, t] <= model.m[i, c, t]
-    model.constraint5 = Constraint(model.V, model.C, model.T, rule=constraint5)
+
+    model.max_allocation_limit_per_node_constraint = Constraint(model.V, model.C, model.T,
+                                                                rule=max_allocation_limit_function)
 
     ## Constraint (6)
     ##cannot exceed max capacity on arc (i,j)
-    def constraint6(model, i, j, c, t, m):
-        return model.x[i, j, c, t, m] <= model.mu[i, j, c, t,m]
-    model.constraint6 = Constraint(model.A, model.C, model.T, model.M, rule=constraint6)
+    
+    def arc_capacity_constraint_function(model, i, j, c, t, m):
+        return model.x[i, j, c, t, m] <= model.mu[i, j, c, t, m]
+
+    model.arc_capacity_constraint = Constraint(model.A, model.C, model.T, model.M,
+                                               rule=arc_capacity_constraint_function)
 
     ## Constraint (7)
     ## cannot exceed the total budgeted cost out of i during t
-    def constraint7(model, i, t):
-        return sum(model.b[c] * model.w[i, c, t] for c in model.C) + sum(model.w[i, m, t] for m in model.M) <= model.Mt[i, t]
-    model.constraint7 = Constraint(model.V, model.T, rule=constraint7)
+    def total_unit_storage_and_cost_limit(model, i, t):
+        return sum(model.b[c] * model.w[i, c, t] for c in model.C) + sum(model.w[i, m, t] for m in model.M) <= model.Mt[
+            i, t]
+
+    model.total_unit_storage_and_cost_limit_constraint = Constraint(model.V, model.T,
+                                                                    rule=total_unit_storage_and_cost_limit)
 
     ## Constraint (10)
     ## Flow balance constraints
+
     ## Keeps up with the flow out, the flow in, the demand consumed, and the demand that is stored there between flow periods
-    def constraint10(model, i, c, t):
-        return sum(sum(model.x[i, j, c, t,m] for j in model.V if (i, j) in model.A) - sum(model.x[j, i, c, t,m] for j in model.V if (j, i) in model.A) for m in model.M) + model.w[i, c, t] - model.w[i, c, t-1] + model.y[i, c, t] == 0
-    model.constraint10 = Constraint(model.V, model.C, model.Tminus, rule=constraint10)
+    def commodity_flow_balance(model, i, c, t):
+        return sum(sum(model.x[i, j, c, t, m] for j in model.V if (i, j) in model.A) - sum(
+            model.x[j, i, c, t, m] for j in model.V if (j, i) in model.A) for m in
+                   model.M) + model.w[i, c, t] - model.w[i, c, t - 1] + model.y[i, c, t] == 0
 
-    def constraint101(model, i, m, t):
-        return sum(sum(model.x[i, j, c, t,m] for j in model.V if (i, j) in model.A) - sum(model.x[j, i, c, t,m] for j in model.V if (j, i) in model.A) for c in model.C) + model.wbar[i, m, t] - model.wbar[i, m, t-1]  == 0
-    model.constraint101 = Constraint(model.V, model.M, model.Tminus, rule=constraint101)
+    model.commodity_flow_balance_constraint = Constraint(model.V, model.C, model.Tminus, rule=commodity_flow_balance)
 
+    def transport_mode_flow_balance(model, i, m, t):
+        return sum(sum(model.x[i, j, c, t, m] for j in model.V if (i, j) in model.A) - sum(
+            model.x[j, i, c, t, m] for j in model.V if (j, i) in model.A)
+                   for c in model.C) + model.wbar[i, m, t] - model.wbar[i, m, t - 1] == 0
+
+    model.transport_mode_flow_balance_constraint = Constraint(model.V, model.M, model.Tminus,
+                                                              rule=transport_mode_flow_balance)
 
     ## Constraint (10.5)
     ##Ensures that if we store commodity c at i then we must have opened that node i for commodity c
-    def constraint10_5(model, i, c):
+
+    def commodity_storage_capacity_limit_function(model, i, c):
         return model.s_var[i, c] <= model.MM[i, c] * model.p_var[i, c]
-    model.constraint10_5 = Constraint(model.V, model.C, rule=constraint10_5)
+
+    model.commodity_storage_capacity_limit_constraint = Constraint(model.V, model.C,
+                                                                   rule=commodity_storage_capacity_limit_function)
 
     ##Ensures that if we store commodity c at i then we must have opened that node i for commodity c
-    def constraint10_51(model, i, m):
-        return model.s_varbar[i, m] <= model.MM[i, 1] * model.p_varbar[i, m]
-    model.constraint10_51 = Constraint(model.V, model.M, rule=constraint10_51)
 
+    def transport_mode_storage_capacity_limit_function(model, i, m):
+        return model.s_varbar[i, m] <= model.MM[i, 1] * model.p_varbar[i, m]
+
+    model.transport_mode_storage_capacity_limit_constraint = Constraint(model.V, model.M,
+                                                                        rule=transport_mode_storage_capacity_limit_function)
 
     ## Constraint (10.6)
     ##Ensures that if we store commodity c at node i then we must have opened i
-    def constraint10_6(model, i, c):
+
+    def commodity_opening_dependency(model, i, c):
         return model.p_var[i, c] <= model.q_var[i]
-    model.constraint10_6 = Constraint(model.V, model.C, rule=constraint10_6)
+
+    model.commodity_opening_dependency_constraint = Constraint(model.V, model.C, rule=commodity_opening_dependency)
 
     ##Ensures that if we store commodity c at node i then we must have opened i
-    def constraint10_61(model, i, m):
+    
+    def transport_mode_opening_dependency(model, i, m):
         return model.p_varbar[i, m] <= model.q_varbar[i]
-    model.constraint10_61 = Constraint(model.V, model.M, rule=constraint10_61)
 
+    model.transport_mode_opening_dependency_constraint = Constraint(model.V, model.M,
+                                                                    rule=transport_mode_opening_dependency)
 
-    ## Constraint (10.7)
-    ##Ensures that we don't open more than P number of APSs
-    def constraint10_7(model):
+    ## Constraint: Maximum Pre-positioned APSs
+    ## Ensures that we don't open more than P number of APSs
+    def maximum_prepositioned_aps(model):
         return sum(model.q_var[i] for i in model.V) <= model.P
-    model.constraint10_7 = Constraint(rule=constraint10_7)
+
+    model.max_prepositioned_aps_constraint = Constraint(rule=maximum_prepositioned_aps)
 
     ## Constraint (10.8)
     ## Makes sure that we have at least L units of commodity c among all starting APS locations
-    def constraint10_8(model, c):
+    
+    def minimum_APS_requirement(model, c):
         return sum(model.p_var[i, c] for i in model.V) >= model.L[c]
-    model.constraint10_8 = Constraint(model.C, rule=constraint10_8)
 
-    ## Constraint (10.9)
+    model.minimum_APS_requirement_constraint = Constraint(model.C, rule=minimum_APS_requirement)
+
+    ## Constraint: Minimum Storage Requirement
     ## Ensures that if we store commodity c at node i then we must store at least some minimum number
-    def constraint10_9(model, i, c):
+    def minimum_storage_requirement(model, i, c):
         return model.s_var[i, c] >= model.ell[i, c] * model.p_var[i, c]
-    model.constraint10_9 = Constraint(model.V, model.C, rule=constraint10_9)
 
+    model.minimum_storage_requirement_constraint = Constraint(model.V, model.C, rule=minimum_storage_requirement)
 
     # Solve the model
     solver = SolverFactory('gurobi')  # or another solver
