@@ -2,9 +2,10 @@ from pyomo.environ import *
 import random
 
 
-
-def build_min_unmet_demand_model(num_locations, num_commodities, num_time_periods, num_APS_locations):
+def build_min_unmet_demand_model(num_locations, num_commodities, num_time_periods, num_APS_locations, num_modes=3):
     # Create a model
+    
+    
     model = ConcreteModel()
 
 
@@ -16,6 +17,8 @@ def build_min_unmet_demand_model(num_locations, num_commodities, num_time_period
     model.A = Set(within=model.V * model.V,
                   initialize=[(i, j) for i in model.V for j in model.V if i != j])  # Fully connected DAG (Directed Acylic Graph
     model.V_s = Set(initialize=range(1, num_APS_locations))  # More special nodes
+
+    model.M = Set(initialize=range(1, num_modes + 1))  # Modes of transportation (1 to num_modes)
 
     ###penalty for a unit of unmet demand at node i for commodity c at the end of time period t
     model.p = Param(model.V, model.C, model.T,
@@ -220,6 +223,7 @@ def build_risk_model(num_locations, num_commodities, num_time_periods, num_APS_l
     model.A = Set(within=model.V * model.V,
                   initialize=[(i, j) for i in model.V for j in model.V if i != j])  # Fully connected DAG (Directed Acylic Graph
     model.V_s = Set(initialize=range(1, num_APS_locations))  # More special nodes
+    model.M = Set(initialize=range(1, num_modes))  # Set containing mode IDs
 
     ###penalty for a unit of unmet demand at node i for commodity c at the end of time period t
     model.p = Param(model.V, model.C, model.T,

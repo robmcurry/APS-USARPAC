@@ -26,10 +26,6 @@
 
 using namespace std;
 
-
-
-
-
 int main() {
     try {
         // Initialize Gurobi environment
@@ -62,7 +58,10 @@ int main() {
                 if (i != j) A.emplace_back(i, j);
             }
         }
-//        cout << endl << endl << "Hello" << endl << endl;
+
+    //output the contents of the set A
+
+
         // Randomized Parameters (Using Maps)
         map<array<int, 3>, double> p, m;
         std::map<std::array<int, 4>, double> mu, r1;  // Replaces tuple<int, int, int, int>
