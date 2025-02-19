@@ -550,6 +550,8 @@ def build_multiobjective_model(num_locations, num_commodities, num_time_periods,
     model.d_bar = Param(model.V, model.C, model.M, within=NonNegativeReals,
                         doc="Days required for mode m to arrive at node i using commodity c")
 
+    
+
     # Lower bound on commodity c consumption before transport mode m arrives
     model.l_bar = Param(model.C, model.M, within=NonNegativeReals,
                         doc="Lower bound on the amount of commodity c consumed for mode m")
@@ -561,6 +563,9 @@ def build_multiobjective_model(num_locations, num_commodities, num_time_periods,
                     doc="1 if at least `l_cmi` units of commodity `c` consumed at node `i` for mode `m` at time `t`, else 0")
 
     # Define variables
+
+
+
     ##The amount of commodity c consumed to meet demand at node i in V
     ##at the end of time t
     model.y = Var(model.V, model.C, model.T, within=NonNegativeIntegers)  # y_ict
@@ -774,7 +779,8 @@ def build_multiobjective_model(num_locations, num_commodities, num_time_periods,
 
     model.activation_threshold_constraint = Constraint(
         model.T, model.A, model.C, model.M, rule=activation_threshold_rule,
-        doc="Activation constraint for transport mode based on phi"
+        doc="Activation const"
+            "raint for transport mode based on phi"
     )
 
     # Solve the model
