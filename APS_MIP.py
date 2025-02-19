@@ -481,7 +481,8 @@ def build_multiobjective_model(num_locations, num_commodities, num_time_periods,
     #model.IndexedSetM = Set(model.M,initialize=lambda model, m: range(m * 10, (m + 1) * 10))  # Indexed set of sets based on M
     model.A = Set(within=model.V * model.V,
                   initialize=[(i, j) for i in model.V for j in model.V if i != j])  # Fully connected DAG (Directed Acylic Graph
-    
+    model.Cm = Set(model.M, within=model.C, doc="Set of precedence commodities for each transport mode m")
+
     model.V_s = Set(initialize=range(1, num_APS_locations))  # More special nodes
 
     ###penalty for a unit of unmet demand at node i for commodity c at the end of time period t
@@ -543,6 +544,21 @@ def build_multiobjective_model(num_locations, num_commodities, num_time_periods,
     model.v = Param(model.M, initialize={m: random.randint(50, 100) for m in model.M})  # Volume capacity for mode m
     model.Q = Param(model.M,
                     initialize={m: random.randint(5, 15) for m in model.M})  # Maximum number of mode m available
+
+    # ***** Parameters *****
+    # Number of days required to use commodity c to build for mode m to arrive at node i
+    model.d_bar = Param(model.V, model.C, model.M, within=NonNegativeReals,
+                        doc="Days required for mode m to arrive at node i using commodity c")
+
+    # Lower bound on commodity c consumption before transport mode m arrives
+    model.l_bar = Param(model.C, model.M, within=NonNegativeReals,
+                        doc="Lower bound on the amount of commodity c consumed for mode m")
+
+    # ***** Variables *****
+    # Binary variable: Equals 1 if at least l_cmi units of commodity c
+    # have been consumed at node i for mode m or not
+    model.phi = Var(model.C, model.M, model.V, model.T, within=Binary,
+                    doc="1 if at least `l_cmi` units of commodity `c` consumed at node `i` for mode `m` at time `t`, else 0")
 
     # Define variables
     ##The amount of commodity c consumed to meet demand at node i in V
@@ -736,6 +752,30 @@ def build_multiobjective_model(num_locations, num_commodities, num_time_periods,
     model.constraint_transportation_volume = Constraint(model.A, model.T, model.M,
                                                         rule=constraint_transportation_volume)
 
+    #### **Constraint 1: Lower Bound on Commodity Consumption**
+
+
+    def precedence_consumption_rule(model, t, i, c, m):
+        if c in model.Cm[m]:
+            return sum(model.y[i, c, v] for v in model.T if v <= t - model.d_bar[i, c, m]) >= \
+                model.l_bar[c, m] * model.phi[c, m, i, t]
+        return Constraint.Skip
+
+    model.precedence_consumption_constraint = Constraint(
+        model.T, model.V, model.C, model.M, rule=precedence_consumption_rule,
+        doc="Precedence consumption constraint for transport mode arrival"
+    )
+
+    def activation_threshold_rule(model, t, i, j, c, m):
+        if c in model.Cm[m]:
+            return model.mu[i, j, c, m] * sum(model.phi[c, m, j, v] for v in model.T if v < t) >= \
+                model.x[i, j, c, m, t]
+        return Constraint.Skip
+
+    model.activation_threshold_constraint = Constraint(
+        model.T, model.A, model.C, model.M, rule=activation_threshold_rule,
+        doc="Activation constraint for transport mode based on phi"
+    )
 
     # Solve the model
     solver = SolverFactory('gurobi')  # or another solver
