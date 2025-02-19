@@ -536,6 +536,14 @@ def build_multiobjective_model(num_locations, num_commodities, num_time_periods,
     ###The minimum number of APS locations starting with commodity c
     model.L = Param(model.C, initialize={c: random.randint(1, 2) for c in model.C})
 
+
+    model.Q = Param(model.M, initialize={m: random.randint(1, 2) for m in model.M})
+
+    # Volume per unit of commodity c
+    model.v = Param(model.M, initialize={m: random.randint(50, 100) for m in model.M})  # Volume capacity for mode m
+    model.Q = Param(model.M,
+                    initialize={m: random.randint(5, 15) for m in model.M})  # Maximum number of mode m available
+
     # Define variables
     ##The amount of commodity c consumed to meet demand at node i in V
     ##at the end of time t
@@ -546,6 +554,8 @@ def build_multiobjective_model(num_locations, num_commodities, num_time_periods,
 
     ##the units of flow on arc (i,j) for commodity c during time t
     model.x = Var(model.A, model.C, model.T, model.M, within=NonNegativeReals)  # x_ijctm
+
+    model.x_bar = Var(model.A, model.T, model.M, within=Binary)  # Binary: mode m is used on arc (i,j) at time t
 
     ##The units of commodity c stored at node i at the end of time period t
     model.w = Var(model.V, model.C, model.T, within=NonNegativeIntegers)  # w_ict
@@ -712,6 +722,20 @@ def build_multiobjective_model(num_locations, num_commodities, num_time_periods,
         return model.s_var[i, c] >= model.ell[i, c] * model.p_var[i, c]
 
     model.minimum_storage_requirement_constraint = Constraint(model.V, model.C, rule=minimum_storage_requirement)
+
+    def constraint_max_transportation_modes(model, m):
+        return sum(model.s_varbar[i, m] for i in model.V) <= model.Q[m]
+
+    model.constraint_max_transportation_modes = Constraint(model.M, rule=constraint_max_transportation_modes)
+
+
+    # Constraint: Transportation volume on arcs
+    def constraint_transportation_volume(model, i, j, t, m):
+        return sum(model.b[c] * model.x[i, j, c, t, m] for c in model.C) <= model.v[m] * model.x_bar[i, j, t, m]
+
+    model.constraint_transportation_volume = Constraint(model.A, model.T, model.M,
+                                                        rule=constraint_transportation_volume)
+
 
     # Solve the model
     solver = SolverFactory('gurobi')  # or another solver
