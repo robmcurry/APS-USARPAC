@@ -384,35 +384,17 @@ def build_risk_model(num_locations, num_commodities, num_time_periods, num_APS_l
  
     ##Need to add a constraint to make sure that we meet demand at some point.
     
-#    def demandconstraint(model, i, c):
-#        return sum(model.y[i,c,t] for t in model.T) >= model.d[i,c]
-#    model.demandconstraint = Constraint(model.V, model.C, rule=demandconstraint)
-
 
 
     # Solve the model
     solver = SolverFactory('gurobi')  # or another solver
     results = solver.solve(model)
 
-    print(results)
-        
-#    for c in model.C:
-#        for i in model.V:
-#            for j in model.V:
-#                for t in model.T:
-#                    if i!=j:
-#                        if model.x[i,j,c,t].value > 0:
-#                            print("commodity ",c," flow on arc (",i,",",j,") during time period ", t," is ", model.x[i,j,c,t].value)
+    # print(results)
 
-    #for i in model.V:
-    #    for c in model.C:
-    #        for t in model.T:
-    #            if model.y[i,c,t].value > 0:
-    #                print("commodity ",c," consumed by node (",i,") at the end of time period ", t," is ", model.y[i,c,t].value)
-#    for c in model.C:
-#        for i in model.V:
-#            if model.s_var[i,c].value > 0:
-#                    print("commodity ",c," prepositioned at (",i,") is ", model.s_var[i,c].value)
+
+# print_variable_values_with_context(model)
+
 
 def build_multiobjective_model(num_locations, num_commodities, num_time_periods, num_APS_locations):
     # Create a model
@@ -423,9 +405,10 @@ def build_multiobjective_model(num_locations, num_commodities, num_time_periods,
     model.V = Set(initialize=range(num_locations))  # Total Nodes
     model.C = Set(initialize=range(1, num_commodities))  # Total Commodities
     model.T = Set(initialize=range(num_time_periods))  # Total Time periods
+    # print("Values in T:", list(model.T))
     model.Tminus = Set(initialize=range(1, num_time_periods))  # Time periods without 0
     model.A = Set(within=model.V * model.V,
-                  initialize=[(i, j) for i in model.V for j in model.V if i != j])  # Fully connected DAG (Directed Acylic Graph
+                  initialize=[(i, j) for i in model.V for j in model.V if i != j and i < j])  # Fully connected DAG (Directed Acylic Graph
     model.V_s = Set(initialize=range(1, num_APS_locations))  # More special nodes
 
     ###penalty for a unit of unmet demand at node i for commodity c at the end of time period t
@@ -434,11 +417,12 @@ def build_multiobjective_model(num_locations, num_commodities, num_time_periods,
 
     ###demand for each commodity c at node i
     model.d = Param(model.V, model.C,
-                    initialize={(i, c): random.randint(30, 100) for i in model.V for c in model.C})
+                    initialize={(i, c): random.randint(300, 1000) for i in model.V for c in model.C})
+    print("Demand (d):", {key: value for key, value in model.d.items()})
 
     ###maximum allowable allocation for commodity c at node i and time t
     model.m = Param(model.V, model.C, model.T,
-                    initialize={(i, c, t): random.randint(50, 100) for i in model.V for c in model.C for t in model.T})
+                    initialize={(i, c, t): random.randint(500, 1000) for i in model.V for c in model.C for t in model.T})
                     
     ###maximum capacity of arc (i,j) for commodity c during time t
     model.mu = Param(model.A, model.C, model.T,
@@ -446,11 +430,11 @@ def build_multiobjective_model(num_locations, num_commodities, num_time_periods,
 
     ###Maximum allowable space for commodity c at node i
     model.M = Param(model.V, model.C,
-                    initialize={(i, c): random.randint(5000, 7000) for i in model.V for c in model.C})
+                    initialize={(i, c): random.randint(2000, 3500) for i in model.V for c in model.C})
                     
     ###Maximum allowable space among all commodities during time t
     model.Mt = Param(model.V, model.T,
-                    initialize={(i, t): random.randint(10, 20) for i in model.V for t in model.T})
+                    initialize={(i, t): random.randint(10, 2000) for i in model.V for t in model.T})
                     
     ###The unit risk associated with sending commodity c on arc (i,j) during time t
     model.r1 = Param(model.A, model.C, model.T,
@@ -466,10 +450,10 @@ def build_multiobjective_model(num_locations, num_commodities, num_time_periods,
 
     ###The minimum required supply of commodity c at location i if commodity c is pre-positioned at location i
     model.ell = Param(model.V, model.C,
-                      initialize={(i, c): round(random.uniform(1, 3), 0) for i in model.V for c in model.C})
+                      initialize={(i, c): round(random.uniform(10, 30), 0) for i in model.V for c in model.C})
 
     ###Upper bound on the number of potential APS locations
-    model.P = Param(initialize=4)
+    model.P = Param(initialize=3)
 
     # Maximum allowable risk
     model.R = Param(initialize=50000)
@@ -504,8 +488,8 @@ def build_multiobjective_model(num_locations, num_commodities, num_time_periods,
     ##equals 1 if node i is pre-positioned with any commodity
     model.q_var = Var(model.V, within=Binary)  # q_i
 
-    demand_weight = 0.5
-    risk_weight = 0.5
+    demand_weight = 1
+    risk_weight = 0
 
     # Objective function
     def objective_function(model):
@@ -517,8 +501,8 @@ def build_multiobjective_model(num_locations, num_commodities, num_time_periods,
     ###defines the demand constraints here
     # Constraint (1)
     def constraint1(model, i, c, t):
-        return sum(model.y[i, c, t_prime] for t_prime in model.T if t_prime <= t) + model.z[i, c, t] == model.d[i, c]
-    model.constraint1 = Constraint(model.V, model.C, model.T, rule=constraint1)
+        return sum(model.y[i, c, t_prime] for t_prime in model.Tminus if t_prime <= t) + model.z[i, c, t] >= model.d[i, c]
+    model.constraint1 = Constraint(model.V, model.C, model.Tminus, rule=constraint1)
 
     # Constraint (3)
     #Ensures that the flow from 0 to j in Vs for commodity c is equal to the determined supply of c at j in Vs
@@ -528,12 +512,12 @@ def build_multiobjective_model(num_locations, num_commodities, num_time_periods,
 
     ## Constraint (4)
     ##These constraints ensure that the total commodity c leftover is equal to the total flow of c supplied minutes the amount consumed
-    def constraint4(model, c):
-        return sum(model.w[i, c, model.T.last()] for i in model.V) == sum(model.s_var[j, c] for j in model.V_s) - sum(model.y[i, c, t] for i in model.V for t in model.T)
-    model.constraint4 = Constraint(model.C, rule=constraint4)
+    # def constraint4(model, c):
+    #     return sum(model.w[i, c, model.T.last()] for i in model.V) == sum(model.s_var[j, c] for j in model.V_s) - sum(model.y[i, c, t] for i in model.V for t in model.T)
+    # model.constraint4 = Constraint(model.C, rule=constraint4)
 
     ## Constraint (5)
-    #Cannot exced m number of units at node i for commodity c at time t
+    #Cannot exceed m number of units at node i for commodity c at time t
     def constraint5(model, i, c, t):
         return model.w[i, c, t] <= model.m[i, c, t]
     model.constraint5 = Constraint(model.V, model.C, model.T, rule=constraint5)
@@ -587,39 +571,43 @@ def build_multiobjective_model(num_locations, num_commodities, num_time_periods,
         return model.s_var[i, c] >= model.ell[i, c] * model.p_var[i, c]
     model.constraint10_9 = Constraint(model.V, model.C, rule=constraint10_9)
 
- 
- 
+    # def demandconstraint(model, i, c):
+    #    return sum(model.y[i,c,t] for t in model.T) >= model.d[i,c]
+    # model.demandconstraint = Constraint(model.V, model.C, rule=demandconstraint)
 
     # Solve the model
     solver = SolverFactory('gurobi')  # or another solver
-    results = solver.solve(model)
+    results = solver.solve(model, options={'MIPGap': 0.00001})
 
-    print(results)
-    print("\nValues of decision variables:")
-    if results.solver.status == SolverStatus.ok and results.solver.termination_condition == TerminationCondition.optimal:
-        print("Optimization successful! Here are the results:")
-        print_variable_values_with_context(model)
-    else:
-        print("Solver did not find an optimal solution.")
+    # print(results)
+    # print("\nValues of decision variables:")
+    # if results.solver.status == SolverStatus.ok and results.solver.termination_condition == TerminationCondition.optimal:
+    #     print("Optimization successful! Here are the results:")
+    #     print_variable_values_with_context(model)
+    # else:
+    #     print("Solver did not find an optimal solution or encountered an issue.")
 
-#    for c in model.C:
-#        for i in model.V:
-#            for j in model.V:
-#                for t in model.T:
-#                    if i!=j:
-#                        if model.x[i,j,c,t].value > 0:
-#                            print("commodity ",c," flow on arc (",i,",",j,") during time period ", t," is ", model.x[i,j,c,t].value)
 
-    #for i in model.V:
-    #    for c in model.C:
-    #        for t in model.T:
-    #            if model.y[i,c,t].value > 0:
-    #                print("commodity ",c," consumed by node (",i,") at the end of time period ", t," is ", model.y[i,c,t].value)
-#    for c in model.C:
-#        for i in model.V:
-#            if model.s_var[i,c].value > 0:
-#                    print("commodity ",c," prepositioned at (",i,") is ", model.s_var[i,c].value)
+    for c in model.C:
+        for i in model.V:
+            for j in model.V:
+                for t in model.Tminus:
+                    if (i,j) in model.A:
+                        if model.x[i,j,c,t].value > 0:
+                            print("commodity ",c," flow on arc (",i,",",j,") during time period ", t," is ", model.x[i,j,c,t].value)
 
+    for i in model.V:
+       for c in model.C:
+           for t in model.T:
+               if model.y[i,c,t].value is not None:
+                   if model.y[i, c, t].value > 0:
+                       print("commodity ",c," consumed by node (",i,") at the end of time period ", t," is ", model.y[i,c,t].value)
+               if model.z[i,c,t].value > 0:
+                   print("commodity ",c," unmet demand at node (",i,") at the end of time period ", t," is ", model.z[i,c,t].value)
+       for c in model.C:
+           for i in model.V:
+               if model.s_var[i,c].value > 0:
+                       print("commodity ",c," prepositioned at (",i,") is ", model.s_var[i,c].value)
 
 
 def print_variable_values_with_context(model):
@@ -640,6 +628,10 @@ def print_variable_values_with_context(model):
                     elif v.name == "w":  # Example: unmet demand variables
                         i, c, t = index
                         print(f"Unmet demand at {i} for commodity {c} at time {t}: {value}")
+
+                    elif v.name == "y":  # Example: unmet demand variables
+                        i, c, t = index
+                        print(f"demand met at {i} for commodity {c} at time {t}: {value}")
                     elif v.name == "s_var":  # Example: surplus/carry-over variables
                         i, c = index
                         print(f"Pre-positioned stock at location {i} for commodity {c}: {value}")
@@ -657,7 +649,7 @@ def main():
 
     num_locations = 10
     num_commodities = 10
-    num_time_periods = 10
+    num_time_periods = 5
     num_APS_locations = 6
     
     # build_min_unmet_demand_model(num_locations, num_commodities, num_time_periods, num_APS_locations)
