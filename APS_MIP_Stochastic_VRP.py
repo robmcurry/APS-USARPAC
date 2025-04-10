@@ -391,6 +391,8 @@ if __name__ == "__main__":
     solver.solve(stochastic_vrp_model)
     solver.solve(deterministic_vrp_model)
 
+
+
     # Display only the variable values for both models
     # print("Stochastic Model Variable Values:")
     # stochastic_vrp_model.display(ostream=None)
