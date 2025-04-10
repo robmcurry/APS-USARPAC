@@ -2,212 +2,209 @@ from pyomo.environ import *
 import random
 
 
+from pyomo.environ import *
 
 
-def build_multiobjective_model(num_locations, num_commodities, num_time_periods, num_APS_locations):
-    # Create a model
+def build_stochastic_vrp_model():
+    # Create a Concrete Model
     model = ConcreteModel()
-       # Define sets (example sizes for each set)
-    model.V = Set(initialize=range(num_locations))  # Total Nodes
-    model.vehicles = Set(initialize=range(1, 51))  # Set numbered 1 to 50
-    model.C = Set(initialize=range(1, num_commodities))  # Total Commodities
-    model.T = Set(initialize=range(num_time_periods))  # Total Time periods
-    
-    
+    node_list = [1, 2, 3, 4]
+    commodity_list = ["Commodity1", "Commodity2"]
+    scenario_list = range(1, 3)  # Scenarios 1, 2
+    time_period_list = range(1, 4)  # Time periods 1, 2, 3
+    time_period_list2 = range(0, 4)  # Time periods 1, 2, 3
+    vehicle_list = range(1, 3)  # Vehicles 1, 2
+    arc_list = [(1, 2), (2, 3), (3, 4), (4, 1)]  # Directed arcs
 
-    demand_weight = 0
-    risk_weight = 1
+    # Initialize Sets from lists
+    model.N = Set(initialize=node_list)
+    model.C = Set(initialize=commodity_list)
+    model.S = Set(initialize=scenario_list)
+    model.T = Set(initialize=time_period_list)
+    model.Tprime = Set(initialize=time_period_list2)
+    model.V = Set(initialize=vehicle_list)
+    model.A = Set(dimen=2, initialize=arc_list)
 
-    # Objective function
-    def objective_function(model):
-        return risk_weight*(sum(model.f[j,c]*model.v[j,c] for c in model.C for j in model.V)) + demand_weight*(sum(model.p[i, c, t] * model.z[i, c, t] for i in model.V for c in model.C for t in model.T))
-    model.obj = Objective(rule=objective_function, sense=minimize)
+    ### Parameters ###
+    # Initialize Parameters
+    model.phi = Param(model.S, initialize={1: 0.6, 2: 0.4},
+                      within=NonNegativeReals)  # Scenario weights: e.g., 60% and 40%
+    # Initialize all required values for delta
+    model.delta = Param(
+        model.N, model.C, model.T, model.S,
+        initialize={
+            (1, "Commodity1", 1, 1): 5,
+            (1, "Commodity1", 2, 1): 10,  # Add this missing value
+            (2, "Commodity2", 2, 1): 20
+        },
+    default=0,  # Default value for any missing (i, c, t, s) combination
 
+        within=NonNegativeReals
+    )
 
-    ###defines the demand constraints here
-    # Constraint (1)
-    def demand_satisfaction_constraint(model, i, c, t):
-        return sum(model.y[i, c, t_prime] for t_prime in model.Tminus if t_prime <= t) + model.z[i, c, t] >= model.d[
-            i, c]
+    model.nu = Param(
+        model.N, model.C,
+        initialize={(1, "Commodity1"): 1.0, (2, "Commodity2"): 1.5},     default=0,  # Default value for any missing (i, c, t, s) combination
+ # Safety stock penalties
+        within=NonNegativeReals
+    )
+    model.M = Param(initialize=1000, within=NonNegativeReals)  # Big-M, example value
+    model.m = Param(
+        model.N,
+        initialize={1: 3, 2: 5, 3: 7, 4: 2},    default=0,  # Default value for any missing (i, c, t, s) combination
+  # Maximum vehicles for node 1, 2, 3, 4
+        within=NonNegativeReals
+    )
+    model.L = Param(
+        model.C,
+        initialize={"Commodity1": 2, "Commodity2": 1},    default=0,  # Default value for any missing (i, c, t, s) combination
+  # Minimum APS constraint per commodity
+        within=NonNegativeReals
+    )
+    model.P = Param(initialize=10, mutable=True, within=NonNegativeReals)  # Maximum APS locations
+    model.d = Param(
+        model.N, model.C, model.S,
+        initialize={(1, "Commodity1", 1): 10, (2, "Commodity2", 1): 20, (3, "Commodity1", 2): 15},    default=0,  # Default value for any missing (i, c, t, s) combination
+  # Demand
+        within=NonNegativeReals
+    )
+    model.b = Param(
+        model.C,
+        initialize={"Commodity1": 5, "Commodity2": 3},    default=0,  # Default value for any missing (i, c, t, s) combination
+  # Weight of commodities
+        within=NonNegativeReals
+    )
+    model.M_node = Param(
+        model.N, model.T,
+        initialize={(1, 1): 50, (2, 2): 75, (3, 3): 100},     default=0,  # Default value for any missing (i, c, t, s) combination
+ # Max capacity of node in each time period
+        within=NonNegativeReals
+    )
+    model.mu = Param(
+        model.V,
+        initialize={1: 15, 2: 20},     default=0,  # Default value for any missing (i, c, t, s) combination
+ # Vehicle capacity
+        within=NonNegativeReals
+    )
+    model.ell = Param(
+        model.N, model.C,
+        initialize={(1, "Commodity1"): 2, (2, "Commodity2"): 3},     default=0,  # Default value for any missing (i, c, t, s) combination
+ # Lower bound for safety stock
+        within=NonNegativeReals
+    )
 
-    model.demand_satisfaction_constraint = Constraint(model.V, model.C, model.Tminus,
-                                                      rule=demand_satisfaction_constraint)
+    ### Variables ###
+    model.x = Var(model.A, model.C, model.T, model.V, model.S, domain=NonNegativeReals)  # Commodity flow on arcs
+    model.y = Var(model.N, model.C, model.T, model.S, domain=NonNegativeReals)  # Satisfied demand
+    model.z = Var(model.N, model.C, model.T, model.S, domain=NonNegativeReals)  # Unmet demand penalty
+    model.w = Var(model.N, model.C, model.Tprime, model.S, domain=NonNegativeReals)  # Inventory levels
+    model.m_i = Var(model.N, domain=NonNegativeReals)  # Vehicle allocation per node
+    model.q = Var(model.N, model.C, domain=NonNegativeReals)  # APS demand allocation variable
+    model.r = Var(model.N, model.C, domain=Binary)  # Binary APS for commodities
+    model.p = Var(model.N, domain=Binary)  # Binary APS for nodes
+    model.alpha = Var(model.N, model.C, model.S, domain=NonNegativeReals)  # Safety stock variables
+    model.bar_x = Var(model.A, model.T, model.V, model.S, domain=Binary)  # Vehicle flow variable
+    model.bar_w = Var(model.N, model.Tprime, model.V, model.S, domain=Binary)  # Binary vehicle inventory variables
 
-    # Constraint (3)
-    #Ensures that the flow from 0 to j in Vs for commodity c is equal to the determined supply of c at j in Vs
-    def starting_inventory_constraint(model, j, c):
-        return model.w[j, c, 0] == model.s_var[j, c]
-    model.starting_inventory_constraint = Constraint(model.V_s, model.C, rule=starting_inventory_constraint)
+    ### Objective Function ###
+    def objective_rule(model):
+        return sum(
+            model.phi[s] * (
+                sum(
+                    sum(
+                        sum(model.delta[i, c, t, s] * model.z[i, c, t, s] for t in model.T) +
+                        model.nu[i, c] * model.alpha[i, c, s]
+                        for c in model.C
+                    )
+                    for i in model.N
+                )
+            )
+            for s in model.S
+        )
 
- 
+    model.objective = Objective(rule=objective_rule, sense=minimize)
 
-    ## Constraint (5)
-    #Cannot exceed m number of units at node i for commodity c at time t
-    def storage_capacity_constraint(model, i, c, t):
-        return model.w[i, c, t] <= model.m[i, c, t]
-    model.storage_capacity_constraint = Constraint(model.V, model.C, model.T, rule=storage_capacity_constraint)
+    ## Constraints ###
+    def max_vehicles_rule(model):
+        return sum(model.m_i[i] for i in model.N) <= 10
+    model.MaximumVehicles = Constraint(rule=max_vehicles_rule)
 
-    ## Constraint (6)
-    ##cannot exceed max capacity on arc (i,j)
-    def arc_capacity_constraint(model, i, j, c, t):
-        return model.x[i, j, c, t] <= model.mu[i, j, c, t]
-    model.arc_capacity_constraint = Constraint(model.A, model.C, model.T, rule=arc_capacity_constraint)
+    def aps_binary_constraint1_rule(model, i, c):
+        return model.q[i, c] <= model.M * model.r[i, c]
 
-    ## Constraint (7)
-    ## cannot exceed the total budgeted cost out of i during t
-    def storage_budget_constraint(model, i, t):
-        return sum(model.b[c] * model.w[i, c, t] for c in model.C) <= model.Mt[i, t]
-    model.storage_budget_constraint = Constraint(model.V, model.T, rule=storage_budget_constraint)
+    model.APSBinary1 = Constraint(model.N, model.C, rule=aps_binary_constraint1_rule)
 
-    ## Constraint (10)
-    ## Flow balance constraints
-    ## Keeps up with the flow out, the flow in, the demand consumed, and the demand that is stored there between flow periods
-    def flow_balance_constraint(model, i, c, t):
-        return sum(model.x[i, j, c, t] for j in model.V if (i, j) in model.A) - sum(
-            model.x[j, i, c, t] for j in model.V if (j, i) in model.A) + model.w[i, c, t] - model.w[i, c, t - 1] + \
-            model.y[i, c, t] == 0
+    def aps_binary_constraint2_rule(model, i, c):
+        return model.r[i, c] <= model.M * model.m_i[i]
 
-    model.flow_balance_constraint = Constraint(model.V, model.C, model.Tminus, rule=flow_balance_constraint)
+    model.APSBinary2 = Constraint(model.N, model.C, rule=aps_binary_constraint2_rule)
 
-    ## Constraint (10.5)
-    ##Ensures that if we store commodity c at i then we must have opened that node i for commodity c
-    def ensure_storage_if_prepositioned(model, i, c):
-        return model.s_var[i, c] <= model.M[i, c] * model.p_var[i, c]
-    model.ensure_storage_if_prepositioned = Constraint(model.V, model.C, rule=ensure_storage_if_prepositioned)
+    def aps_binary_constraint3_rule(model, i, c):
+        return model.r[i, c] <= model.M * model.p[i]
 
-    ## Constraint (10.6)
-    ##Ensures that if we store commodity c at node i then we must have opened i
-    def ensure_prepositioning_if_opened(model, i, c):
-        return model.p_var[i, c] <= model.q_var[i]
-    model.ensure_prepositioning_if_opened = Constraint(model.V, model.C, rule=ensure_prepositioning_if_opened)
+    model.APSBinary3 = Constraint(model.N, model.C, rule=aps_binary_constraint3_rule)
 
-    ## Constraint (10.7)
-    ##Ensures that we don't open more than P number of APSs
-    def limit_APS_open_locations(model):
-        return sum(model.q_var[i] for i in model.V) <= model.P
+    def max_aps_locations_rule(model):
+        return sum(model.p[i] for i in model.N) <= model.P
 
-    model.limit_APS_open_locations = Constraint(rule=limit_APS_open_locations)
+    model.MaxAPSLocations = Constraint(rule=max_aps_locations_rule)
 
-    ## Constraint (10.8)
-    ## Makes sure that we have at least L units of commodity c among all starting APS locations
-    def minimum_APS_commodities_constraint(model, c):
-        return sum(model.p_var[i, c] for i in model.V) >= model.L[c]
-    model.minimum_APS_commodities_constraint = Constraint(model.C, rule=minimum_APS_commodities_constraint)
+    def min_aps_per_commodity_rule(model, c):
+        return sum(model.r[i, c] for i in model.N) >= model.L[c]
 
-    ## Constraint (10.9)
-    ## Ensures that if we store commodity c at node i then we must store at least some minimum number
-    def ensure_minimum_storage_if_prepositioning(model, i, c):
-        return model.s_var[i, c] >= model.ell[i, c] * model.p_var[i, c]
+    model.MinAPSPerCommodity = Constraint(model.C, rule=min_aps_per_commodity_rule)
 
-    model.ensure_minimum_storage_if_prepositioning = Constraint(model.V, model.C,
-                                                                rule=ensure_minimum_storage_if_prepositioning)
+    def demand_constraints_rule(model, i, c, s):
+        return sum(model.y[i, c, t, s] for t in model.T) + model.z[i, c, model.T.last(), s] == model.d[i, c, s]
 
-    def leftover_values(model, j, c):
-        return model.v[j,c] >= model.p_var[j,c]*model.n[j,c] - model.w[j,c,num_time_periods-1]
-    model.leftover_values = Constraint(model.V, model.C, rule=leftover_values)
+    model.DemandConstraints = Constraint(model.N, model.C, model.S, rule=demand_constraints_rule)
 
-    ##Enforces that we don't take on too much risk
-    def total_risk_constraint(model):
-        return sum(sum(sum(model.r1[i, j, c, t] * model.x[i, j, c, t] for (i, j) in model.A) +
-                       sum(model.r2[i, c, t] * model.w[i, c, t] for i in model.V) + sum(
-            model.r3[i, c] * model.s_var[i, c] for i in model.V) for t in model.T) for c in model.C) <= model.R
+    def commodity_flow_balance_rule(model, i, c, t, s):
+        return sum(model.x[i, j, c, t, v, s] for j in model.N if (i,j) in model.A for v in model.V) - sum(
+            model.x[j, i, c, t, v, s] for j in model.N if (j,i) in model.A for v in model.V) + model.w[i, c, t, s] - (
+            model.w[i, c, t - 1, s] if t > 1 else 0) + model.y[i, c, t, s] == 0
 
-    model.total_risk_constraint = Constraint(rule=total_risk_constraint)
+    model.CommodityFlowBalance = Constraint(model.N, model.C, model.T, model.S, rule=commodity_flow_balance_rule)
 
+    def max_node_cap_rule(model, i, t, s):
+        return sum(model.b[c] * model.w[i, c,t, s]  for c in model.C) <= model.M_node[i, t]
 
+    model.MaxNodeCapacity = Constraint(model.N, model.T, model.S, rule=max_node_cap_rule)
 
-    # Solve the model
-    solver = SolverFactory('gurobi')  # or another solver
-    results = solver.solve(model, options={'MIPGap': 0.00001})
+    def safety_stock_constraint_rule(model, i, c, s):
+        return model.alpha[i, c, s] >= model.ell[i, c] - (model.q[i, c] - sum(
+            model.x[i, j, c, t, v, s] for j in model.N if (i,j) in model.A for v in model.V for t in model.T) - sum(model.x[j, i, c, t, v, s] for j in model.N if (j,i) in model.A for v in model.V for t in model.T))
 
-    # print(results)
-    # print("\nValues of decision variables:")
-    # if results.solver.status == SolverStatus.ok and results.solver.termination_condition == TerminationCondition.optimal:
-    #     print("Optimization successful! Here are the results:")
-    #     print_variable_values_with_context(model)
-    # else:
-    #     print("Solver did not find an optimal solution or encountered an issue.")
+    model.SafetyStockConstraint = Constraint(model.N, model.C, model.S, rule=safety_stock_constraint_rule)
 
+    def vehicle_flow_balance_rule(model, i, t, v, s):
+        return sum(model.bar_x[i, j, t, v, s] for j in model.N if (i,j) in model.A) - sum(model.bar_x[j, i, t, v, s] for j in model.N if (j,i) in model.A) + \
+            model.bar_w[i, t, v, s] - (model.bar_w[i, t - 1, v, s] if t > 0 else 0) == 0
 
-    for c in model.C:
-        for i in model.V:
-            for j in model.V:
-                for t in model.Tminus:
-                    if (i,j) in model.A:
-                        if model.x[i,j,c,t].value > 0:
-                            print("commodity ",c," flow on arc (",i,",",j,") during time period ", t," is ", model.x[i,j,c,t].value)
+    model.VehicleFlowBalance = Constraint(model.N, model.T, model.V, model.S, rule=vehicle_flow_balance_rule)
 
-    for i in model.V:
-       for c in model.C:
-           for t in model.T:
-               if model.y[i,c,t].value is not None:
-                   if model.y[i, c, t].value > 0:
-                       print("commodity ",c," consumed by node (",i,") at the end of time period ", t," is ", model.y[i,c,t].value)
-               if model.z[i,c,t].value is not None:
+    def vehicles_return_rule(model, i, t, v, s):
+        return model.bar_w[i, model.T.last(), v, s] == model.m_i[i]
 
-                   if model.z[i,c,t].value > 0:
-                       print("commodity ",c," unmet demand at node (",i,") at the end of time period ", t," is ", model.z[i,c,t].value)
-       for c in model.C:
-           for i in model.V:
-               if model.s_var[i,c].value > 0:
-                       print("commodity ",c," prepositioned at (",i,") is ", model.s_var[i,c].value)
+    model.VehiclesReturn = Constraint(model.N, model.T, model.V, model.S, rule=vehicles_return_rule)
 
+    ### Additional Aspects ###
+    # Define more constraints based on your use case.
 
+    return model
 
-       if model.v[i,c].value is not None:
-
-           if model.v[i,c].value > 0:
-              print("commodity ",c," deficit node (",i,") at the end of all time periods is ", model.v[i,c].value)
-
-def print_variable_values_with_context(model):
-    """
-    Prints all variable values from the model with problem-specific context.
-    """
-    for v in model.component_objects(Var, active=True):  # Loop through all variables
-        var_object = getattr(model, str(v))  # Get the full variable object
-        for index in var_object:  # Loop over each index in the variable
-            # Context-specific output
-            value = var_object[index].value
-            if value is not None and abs(value) > 1e-6:  # Only print non-negligible values
-                if isinstance(index, tuple):  # Variables with multiple indices
-                    # Customize context based on the variable
-                    if v.name == "x":  # Example: flow variables
-                        i, j, c, t = index
-                        print(f"Flow from {i} to {j} for commodity {c} at time {t}: {value}")
-                    elif v.name == "w":  # Example: unmet demand variables
-                        i, c, t = index
-                        print(f"Unmet demand at {i} for commodity {c} at time {t}: {value}")
-
-                    elif v.name == "y":  # Example: unmet demand variables
-                        i, c, t = index
-                        print(f"demand met at {i} for commodity {c} at time {t}: {value}")
-                    elif v.name == "s_var":  # Example: surplus/carry-over variables
-                        i, c = index
-                        print(f"Pre-positioned stock at location {i} for commodity {c}: {value}")
-
-                    # elif v.name == "z":  # Example: penalty variables
-                    #     i, c, t = index
-                    #     print(f"Penalty value for {i}, commodity {c}, at time {t}: {value}")
-                    # Expand with more problem-specific logic for other variables
-                else:  # Variables with a single index
-                    print(f"{v.name}[{index}] = {value}")
-
-
-
-def main():
-
-    num_locations = 10
-    num_commodities = 10
-    num_time_periods = 5
-    num_APS_locations = 6
-    
-    # build_min_unmet_demand_model(num_locations, num_commodities, num_time_periods, num_APS_locations)
-
-    # build_risk_model(num_locations, num_commodities, num_time_periods, num_APS_locations)
-
-    build_multiobjective_model(num_locations, num_commodities, num_time_periods, num_APS_locations)
 
 if __name__ == "__main__":
-    main()
+    # Instantiate the model
+    stochastic_vrp_model = build_stochastic_vrp_model()
+
+    # Solve with a solver
+    # solver = SolverFactory("glpk")  # Replace with a solver like CPLEX or Gurobi, if needed
+    # results = solver.solve(stochastic_vrp_model)
+    #
+    # # Post-process results
+
+    # stochastic_vrp_model.display()
+
 
 
