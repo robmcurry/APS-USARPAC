@@ -2,9 +2,9 @@ from pyomo.environ import *
 import random
 
 
-
 def build_min_unmet_demand_model(num_locations, num_commodities, num_time_periods, num_APS_locations):
     # Create a model
+
     model = ConcreteModel()
 
 
@@ -31,7 +31,7 @@ def build_min_unmet_demand_model(num_locations, num_commodities, num_time_period
     ###maximum allowable allocation for commodity c at node i and time t
     model.m = Param(model.V, model.C, model.T,
                     initialize={(i, c, t): random.randint(50, 100) for i in model.V for c in model.C for t in model.T})
-                    
+
     ###maximum capacity of arc (i,j) for commodity c during time t
     model.mu = Param(model.A, model.C, model.T,
                      initialize={(i, j, c, t): random.randint(0, 10) for (i, j) in model.A for c in model.C for t in model.T})
@@ -39,11 +39,11 @@ def build_min_unmet_demand_model(num_locations, num_commodities, num_time_period
     ###Maximum allowable space for commodity c at node i
     model.M = Param(model.V, model.C,
                     initialize={(i, c): random.randint(5000, 7000) for i in model.V for c in model.C})
-                    
+
     ###Maximum allowable space among all commodities during time t
     model.Mt = Param(model.V, model.T,
                     initialize={(i, t): random.randint(10, 20) for i in model.V for t in model.T})
-                    
+
     ###The unit risk associated with sending commodity c on arc (i,j) during time t
     model.r1 = Param(model.A, model.C, model.T,
                      initialize={(i, j, c, t): random.randint(1, 5) for (i, j) in model.A for c in model.C for t in model.T})
@@ -190,24 +190,6 @@ def build_min_unmet_demand_model(num_locations, num_commodities, num_time_period
     results = solver.solve(model)
 
     print(results)
-   
-   # for c in model.C:
-   #     for i in model.V:
-   #         for j in model.V:
-   #             for t in model.T:
-   #                 if i!=j:
-   #                     if model.x[i,j,c,t].value > 0:
-   #                         print("commodity ",c," flow on arc (",i,",",j,") during time period ", t," is ", model.x[i,j,c,t].value)
-
-    #for i in model.V:
-    #    for c in model.C:
-    #        for t in model.T:
-    #            if model.y[i,c,t].value > 0:
-    #                print("commodity ",c," consumed by node (",i,") at the end of time period ", t," is ", model.y[i,c,t].value)
-#    for c in model.C:
-#        for i in model.V:
-#            if model.s_var[i,c].value > 0:
-#                    print("commodity ",c," prepositioned at (",i,") is ", model.s_var[i,c].value)
 
 
 
