@@ -10,11 +10,11 @@ from gurobipy import GRB
 def solve_stochastic_vrp_benders():
 
     # Data initialization
-    time_period_list = range(1, 11)  # Time periods 1 to 10
-    vehicle_list = range(1, 11)  # Vehicles 1 to 10
-    arc_list = random.sample([(i, j) for i in range(1, 11) for j in range(1, 11) if i != j], 60)
-    node_list = list(range(1, 11))  # Nodes 1 to 50
-    commodity_list = [f"Commodity{k}" for k in range(1, 11)]  # Commodities 1 to 10
+    time_period_list = range(1, 6)  # Time periods 1 to 10
+    vehicle_list = range(1, 6)  # Vehicles 1 to 10
+    arc_list = random.sample([(i, j) for i in range(1, 6) for j in range(1, 6) if i != j], 20)
+    node_list = list(range(1, 6))  # Nodes 1 to 50
+    commodity_list = [f"Commodity{k}" for k in range(1, 6)]  # Commodities 1 to 10
     scenario_list = range(1, 6)  # Scenarios 1 to 15
 
     print(arc_list)
@@ -33,19 +33,29 @@ def solve_stochastic_vrp_benders():
     p = master.addVars(node_list, vtype=GRB.BINARY, name="p")
     r = master.addVars(node_list, commodity_list, vtype=GRB.BINARY, name="r")
     theta = master.addVar(name="theta", lb=0)
-    L = {f"Commodity{k}": 2 for k in range(1, 11)}
+    L = {f"Commodity{k}": 2 for k in range(1, 6)}
     P = 10
+
+    ell = {(i, c): 1 for i in node_list for c in commodity_list}
+    M_node = {(i, t): 20 * ((i + t) % 5 + 1) for i in node_list for t in time_period_list}
+    d = {
+        (i, c, t): (i + t) % 10 * 5 for i in node_list for c in commodity_list for t in time_period_list
+    }
     # Master objective
     master.setObjective(theta,
         GRB.MINIMIZE
     )
 
     # Master constraints
-    master.addConstr(gp.quicksum(m_i[i] for i in node_list) <= 10, "MaxVehicles")
+    master.addConstr(gp.quicksum(m_i[i] for i in node_list) <= 8, "MaxVehicles")
     master.addConstr(gp.quicksum(p[i] for i in node_list) <= P, "MaxAPSLocationsLimit")
+    master.addConstr(gp.quicksum(p[i] for i in node_list) <= 8, "MaxAPSLocations")
     master.addConstrs((q[i, c] <= 1000 * r[i, c] for i in node_list for c in commodity_list), "RestrictedAPS")
+    master.addConstrs((gp.quicksum(q[i, c] for c in commodity_list) <= 20 for i in node_list), "MaxCommodityPerNode")
+
     master.addConstrs((r[i, c] <= p[i] for i in node_list for c in commodity_list), "RestrictedAssignment")
-    
+    master.addConstrs((r[i, c] <= m_i[i] for i in node_list for c in commodity_list),"CommodityPlacementRequiresVehicle")
+
     master.addConstrs((gp.quicksum(r[i, c] for i in node_list) >= L[c] for c in commodity_list), "MinAPSPerCommodity")
 
     master.update()
@@ -77,17 +87,17 @@ def solve_stochastic_vrp_benders():
 
         
 
-        # print("Positive variable values from the master problem:")
-        # positive_vars_master = {var.VarName: var.X for var in master.getVars() if var.X > 0}
-        # for var_name, var_value in positive_vars_master.items():
-        #     print(f"{var_name}: {var_value:.2f}")
+        print("Positive variable values from the master problem:")
+        positive_vars_master = {var.VarName: var.X for var in master.getVars() if var.X > 0}
+        for var_name, var_value in positive_vars_master.items():
+            print(f"{var_name}: {var_value:.2f}")
 
         # Solve subproblems for all scenarios
         subproblem_costs = []
         infeasible_scenarios = []
         # for s in scenario_list:
         subproblem, subproblem_cost = solve_subproblem(
-                m_i_sol, q_sol, p_sol, r_sol, node_list, commodity_list, time_period_list, arc_list, vehicle_list
+                m_i_sol, q_sol, p_sol, r_sol, node_list, commodity_list, time_period_list, arc_list, vehicle_list,d, M_node,ell
         )
 
         
@@ -97,16 +107,16 @@ def solve_stochastic_vrp_benders():
             print(f"Subproblem for scenario {s} is infeasible.")
         else:
             # subproblem_costs.append(subproblem_cost)
-            dual_flow = {
-                (i, c, t, s): subproblem.getConstrByName(f"CommodityFlowBalance[{i},{c},{t},{s}]").Pi
-                for i in node_list
-                for c in commodity_list
-                for t in time_period_list
-                for s in scenario_list
-                if subproblem.getConstrByName(f"CommodityFlowBalance[{i},{c},{t},{s}]") is not None
-            }
+            # dual_flow = {
+            #     (i, c, t, s): subproblem.getConstrByName(f"CommodityFlowBalance[{i},{c},{t},{s}]").Pi
+            #     for i in node_list
+            #     for c in commodity_list
+            #     for t in time_period_list
+            #     for s in scenario_list
+            #     if subproblem.getConstrByName(f"CommodityFlowBalance[{i},{c},{t},{s}]") is not None
+            # }
             dual_demand = {
-                (i, c, s): subproblem.getConstrByName(f"DemandConstraints[{i},{c},{t},{s}]").Pi
+                (i, c,t, s): subproblem.getConstrByName(f"DemandConstraints[{i},{c},{t},{s}]").Pi
                 for i in node_list
                 for c in commodity_list
                 for t in time_period_list
@@ -118,24 +128,49 @@ def solve_stochastic_vrp_benders():
                 for t in time_period_list
                 for s in scenario_list
             }
+            dual_start_inventory = {
+                (i, c, s): subproblem.getConstrByName(f"StartingInventory[{i},{c},{s}]").Pi
+                for i in node_list
+                for c in commodity_list
+                for s in scenario_list
+            }
+
+            # dual_safety
+
+
             dual_safety = {
                 (i, c, s): subproblem.getConstrByName(f"SafetyStockConstraint[{i},{c},{s}]").Pi
                 for i in node_list
                 for c in commodity_list
                 for s in scenario_list
             }
+            dual_flows_match = {
+                (i,c,s): subproblem.getConstrByName(f"FlowsMatchAPSInventory[{i},{c},{s}]").Pi
+                for i in node_list
+                for c in commodity_list
+                for s in scenario_list
+            }
+
+            dual_vehicle_match = {
+                (i,s): subproblem.getConstrByName(f"VehicleMatchAPSInventory[{i},{s}]").Pi
+                for i in node_list
+                for s in scenario_list
+            }
+            dual_vehicle_return = {
+                (i,s): subproblem.getConstrByName(f"VehiclesReturn[{i},{s}]").Pi
+                for i in node_list
+                for s in scenario_list
+            }
 
               # Construct the optimality cut
             optimality_cut = (gp.quicksum(
-                          dual_flow[i, c, t, s] * q[i, c] for i in node_list for c in commodity_list for t in
-                          time_period_list for s in scenario_list)
-                      + gp.quicksum(
-                  dual_demand[i, c, s] * q[i, c] for i in node_list for c in commodity_list for s in scenario_list)
-                      + gp.quicksum(
-                  dual_capacity[i, t, s] * m_i[i] for i in node_list for t in time_period_list for s in scenario_list)
-                      + gp.quicksum(
-                  dual_safety[i, c, s] * q[i, c] for i in node_list for c in commodity_list for s in scenario_list)
-                      + subproblem_cost
+                  dual_demand[i, c,t, s] * d.get((i, c, s), 0) for i in node_list for c in commodity_list for s in scenario_list for t in time_period_list)
+                    + gp.quicksum(M_node.get((i,t),0)*dual_capacity[i,t,s] for i in node_list for t in time_period_list for s in scenario_list)
+                      + gp.quicksum((ell.get((i,c),0)-q[i, c])*dual_safety[i, c, s]
+                                    for i in node_list for c in commodity_list for s in scenario_list)
+                              + gp.quicksum(dual_flows_match[i,c,s]*q[i,c] for i in node_list for c in commodity_list for s in scenario_list)
+                              + gp.quicksum(dual_vehicle_match[i,s]*m_i[i] for i in node_list for s in scenario_list)
+                              + gp.quicksum(dual_vehicle_return[i,s]*m_i[i] for i in node_list for s in scenario_list)
             )
 
             # Ensure master variable theta bounds the subproblem cost
@@ -169,75 +204,18 @@ def solve_stochastic_vrp_benders():
             print(f"{var_name}: {var_value:.2f}")
 
 
-# def add_optimality_cut(master, theta, m_i_sol, q_sol, p_sol, r_sol, subproblem_cost, subproblem, node_list, commodity_list, time_period_list, scenario_list):
-    # dual_flow = {
-    #     (i, c, t, s): subproblem.getConstrByName(f"CommodityFlowBalance[{i},{c},{t},{s}]").Pi
-    #     for i in node_list
-    #     for c in commodity_list
-    #     for t in time_period_list
-    #     for s in scenario_list
-    #     if subproblem.getConstrByName(f"CommodityFlowBalance[{i},{c},{t},{s}]") is not None
-    # }
-    #
-    # # dual_commodity_flow = {
-    # #     (i, c, t, s): subproblem.getConstrByName(
-    # #         f"CommodityFlowBalance[{i},{c},{t},{s}]"
-    # #     ).Pi
-    # #     for i in node_list
-    # #     for c in commodity_list
-    # #     for t in time_period_list
-    # #     for s in scenario_list
-    # # }
-    #
-    # dual_demand = {
-    #     (i, c,s): subproblem.getConstrByName(f"DemandConstraints[{i},{c},{t},{s}]").Pi
-    #     for i in node_list
-    #     for c in commodity_list
-    #     for t in time_period_list
-    #     for s in scenario_list
-    # }
-    # dual_capacity = {
-    #     (i, t,s): subproblem.getConstrByName(f"MaxNodeCap[{i},{t},{s}]").Pi
-    #     for i in node_list
-    #     for t in time_period_list
-    #     for s in scenario_list
-    # }
-    # dual_safety = {
-    #     (i, c,s): subproblem.getConstrByName(f"SafetyStockConstraint[{i},{c},{s}]").Pi
-    #     for i in node_list
-    #     for c in commodity_list
-    #     for s in scenario_list
-    # }
-    #
-    # # Construct the optimality cut
-    # optimality_cut = (
-    #         gp.quicksum(
-    #                 dual_flow[i, c, t,s] * q[i, c] for i in node_list for c in commodity_list for t in time_period_list for s in scenario_list)
-    #             + gp.quicksum(dual_demand[i, c,s] * q[i, c] for i in node_list for c in commodity_list for s in scenario_list)
-    #             + gp.quicksum(dual_capacity[i, t,s] * m_i[i] for i in node_list for t in time_period_list for s in scenario_list)
-    #             + gp.quicksum(dual_safety[i, c,s] * q[i, c] for i in node_list for c in commodity_list for s in scenario_list)
-    #             + subproblem_cost
-    # )
-    #
-    # # Ensure master variable theta bounds the subproblem cost
-    # master.addConstr(theta >= optimality_cut, name=f"OptimalityCut_s{s}")
-
 
 # ```python
-def solve_subproblem(m_i, q, p, r, node_list, commodity_list, time_period_list, arc_list,vehicle_list):
+def solve_subproblem(m_i, q, p, r, node_list, commodity_list, time_period_list, arc_list,vehicle_list,d,M_node,ell):
     subproblem = gp.Model(f"Subproblem_Scenario")
     subproblem.Params.OutputFlag = 0
     scenario_list = range(1, 6)  # Scenarios 1 to 10
-    time_period_list2 = range(0, 11)  # Time periods 0 to 10
+    time_period_list2 = range(0, 6)  # Time periods 0 to 10
 
-    d = {
-        (i, c, t): (i + t) % 10 * 5 for i in node_list for c in commodity_list for t in time_period_list
-    }
 
-    b = {f"Commodity{k}": 1 for k in range(1, 11)}
-    M_node = {(i, t): 10000 * ((i + t) % 5 + 1) for i in node_list for t in time_period_list}
-    mu = {i: 30000 for i in range(1, 11)}
-    ell = {(i, c): 1 for i in node_list for c in commodity_list}
+
+    b = {f"Commodity{k}": 1 for k in range(1, 6)}
+    mu = {i: 30000 for i in range(1, 6)}
 
     # Add second-stage decision variables (flow, inventory, unmet demand, etc.)
     x = subproblem.addVars(arc_list, commodity_list, time_period_list,vehicle_list, scenario_list, name="x", lb=0)
@@ -331,14 +309,45 @@ def solve_subproblem(m_i, q, p, r, node_list, commodity_list, time_period_list, 
         ),
         "VehicleFlowBalance",
     )
-
     subproblem.addConstrs(
         (
-            gp.quicksum(bar_w[i, time_period_list[-1], v, s] for v in vehicle_list) >= m_i[i]
+            w[i, c, 1, s] +
+            gp.quicksum(x[i, j, c, 1, v, s] for v in vehicle_list for j in node_list if (i, j) in arc_list)
+            == q[i][c]
+            for i in node_list
+            for c in commodity_list
+            for s in scenario_list
+        ),
+        "FlowsMatchAPSInventory"
+    )
+    subproblem.addConstrs(
+        (
+            gp.quicksum(bar_w[i, 1, v,s] + gp.quicksum(bar_x[i, j, 1, v, s] for j in node_list if (i, j) in arc_list)
+                        for v in vehicle_list)
+            == m_i[i]
             for i in node_list
             for s in scenario_list
         ),
-        "VehiclesReturn",
+        "VehicleMatchAPSInventory"
+    )
+    T = max(time_period_list)  # Assuming T is the last time period
+
+    subproblem.addConstrs(
+        (
+            gp.quicksum(bar_w[i, T, v, s] for v in vehicle_list) == m_i[i]
+            for i in node_list
+            for s in scenario_list
+        ),
+        "VehiclesReturn"
+    )
+    subproblem.addConstrs(
+        (
+            gp.quicksum(bar_x[i, j, 1, v, s] for (i, j) in arc_list) <=
+            gp.quicksum(bar_x[i, j, 1, v + 1, s] for (i, j) in arc_list)
+            for v in range(1, len(vehicle_list))  # v = 1, ..., |V|-1
+            for s in scenario_list
+        ),
+        "VehicleFlowMonotonicity"
     )
 
     subproblem.optimize()
@@ -347,17 +356,24 @@ def solve_subproblem(m_i, q, p, r, node_list, commodity_list, time_period_list, 
     if subproblem.status == GRB.INFEASIBLE:
         return subproblem, float('inf')  # Indicates infeasibility
     else:
-        # positive_z_vars = {z[i, c, t, s].VarName: z[i, c, t, s].X for i in node_list for c in commodity_list for t in
-        #                    time_period_list for s in scenario_list if z[i, c, t, s].X > 0}
-        # print("Positive z variable values:")
-        # for var_name, var_value in positive_z_vars.items():
-        #     print(f"{var_name}: {var_value:.2f}")
+        positive_z_vars = {z[i, c, t, s].VarName: z[i, c, t, s].X for i in node_list for c in commodity_list for t in
+                           time_period_list for s in scenario_list if z[i, c, t, s].X > 0}
+        print("Positive z variable values:")
+        for var_name, var_value in positive_z_vars.items():
+            print(f"{var_name}: {var_value:.2f}")
 
-        # positive_y_vars = {y[i, c, t, s].VarName: y[i, c, t, s].X for i in node_list for c in commodity_list for t in
-        #                    time_period_list for s in scenario_list if y[i, c, t, s].X > 0}
-        # print("Positive y variable values:")
-        # for var_name, var_value in positive_y_vars.items():
-        #     print(f"{var_name}: {var_value:.2f}")
+        positive_y_vars = {y[i, c, t, s].VarName: y[i, c, t, s].X for i in node_list for c in commodity_list for t in
+                           time_period_list for s in scenario_list if y[i, c, t, s].X > 0}
+        print("Positive y variable values:")
+        for var_name, var_value in positive_y_vars.items():
+            print(f"{var_name}: {var_value:.2f}")
+
+        positive_x_vars = {x[i, j, c, t, v, s].VarName: x[i, j, c, t, v, s].X for i, j in arc_list for c in
+                           commodity_list for t in
+                           time_period_list for v in vehicle_list for s in scenario_list if x[i, j, c, t, v, s].X > 0}
+        print("Positive x variable values:")
+        for var_name, var_value in positive_x_vars.items():
+            print(f"{var_name}: {var_value:.2f}")
 
         return subproblem, subproblem.ObjVal
 
