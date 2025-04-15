@@ -180,10 +180,10 @@ def solve_stochastic_vrp():
     time_period_list2 = range(0, 11)  # Time periods 0 to 10
     vehicle_list = range(1, 11)  # Vehicles 1 to 100
     arc_list = random.sample([(i, j) for i in range(1, 51) for j in range(1, 51) if i != j],
-                             120)  # Random 120 directed arcs
+                             120)  # Random set of 120 arcs
     node_list = list(range(1, 51))  # Nodes 1 to 50
     commodity_list = [f"Commodity{k}" for k in range(1, 11)]  # Commodities 1 to 10
-    scenario_list = range(1, 16)  # Scenarios 1 to 10
+    scenario_list = range(1, 6)  # Scenarios 1 to 10
 
     # Parameters
     phi = {s: 1 / len(scenario_list) for s in scenario_list}  # Uniform scenario probabilities
@@ -329,9 +329,8 @@ def solve_stochastic_vrp():
 
     model.addConstrs(
         (
-            bar_w[i, time_period_list[-1], v, s] == m_i[i]
+            gp.quicksum(bar_w[i, time_period_list[-1], v, s] for v in vehicle_list) == m_i[i]
             for i in node_list
-            for v in vehicle_list
             for s in scenario_list
         ),
         "VehiclesReturn",
