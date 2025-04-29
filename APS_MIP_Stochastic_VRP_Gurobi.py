@@ -1,9 +1,4 @@
-from pyomo.environ import *
 import random
-
-
-from pyomo.environ import *
-
 
 
 import gurobipy as gp

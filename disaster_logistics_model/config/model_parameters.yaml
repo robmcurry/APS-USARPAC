@@ -1,0 +1,16 @@
+seed: 42
+num_scenarios: 100
+
+default_disaster:
+  severity_range: [1.0, 5.0]
+  affected_radius:
+    base: 1
+    multiplier: 1
+
+commodities:
+  - food
+  - water
+
+arc_capacity:
+  base: 500
+  multiplier: 150
