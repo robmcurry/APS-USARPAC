@@ -1,16 +1,42 @@
-seed: 42
-num_scenarios: 100
 
-default_disaster:
-  severity_range: [1.0, 5.0]
-  affected_radius:
-    base: 1
-    multiplier: 1
 
-commodities:
-  - food
-  - water
+network:
+  location_file: "disaster_logistics_model/data/pacific_cities.csv"
+  shift_longitudes: true
 
-arc_capacity:
-  base: 500
-  multiplier: 150
+simulation:
+  num_scenarios: 100
+  disaster_types: ["typhoon"]
+  severity_distribution:
+    mean: 2.0
+    std_dev: 0.5
+  disaster_radius_km: 1500
+  base_demand_food_per_capita: 5
+  base_demand_water_per_capita: 15
+  supply_fraction: 0.75
+
+optimization:
+  P_max: 5  # Maximum number of APS sites
+  required_safety_stock: 10
+  M: 10000  # Big-M value for linking constraints
+  vehicle_capacity_food: 1000
+  vehicle_capacity_water: 1000
+  max_vehicles: 10
+  time_periods: 5
+  commodities: ["food", "water"]
+  vehicle_list: [1, 2, 3, 4, 5]
+
+visualization:
+  zoom_start: 3
+  node_radius: 5
+  node_color: 'blue'
+  node_opacity: 0.7
+  flow_color: 'green'
+  flow_width: 2
+  flow_opacity: 0.5
+  epicenter_color: 'red'
+  impact_rings_km: [500, 1000, 1500]
+
+output:
+  batch_summary_file: "disaster_logistics_model/output/batch_summary.csv"
+  scenario_maps_folder: "disaster_logistics_model/output/scenario_maps"

@@ -1,37 +1,53 @@
 import pandas as pd
 import networkx as nx
 from geopy.distance import geodesic
+from math import radians, cos, sin, asin, sqrt
 
+def haversine(coord1, coord2):
+    """
+    Calculate the great-circle distance between two points
+    on the Earth's surface given as (lat, lon).
+    Returns distance in kilometers.
+    """
+    lat1, lon1 = coord1
+    lat2, lon2 = coord2
+
+    # Convert decimal degrees to radians
+    lat1, lon1, lat2, lon2 = map(radians, [lat1, lon1, lat2, lon2])
+
+    # Haversine formula
+    dlon = lon2 - lon1
+    dlat = lat2 - lat1
+    a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
+    c = 2 * asin(sqrt(a))
+
+    # Radius of earth in kilometers (mean radius)
+    r = 6371
+    return c * r
 
 def build_geospatial_network(csv_file):
-    """
-    Builds a NetworkX graph from a CSV of nodes with lat/lon and returns both:
-    - G: the graph with weighted edges (km distance)
-    - locations: a dict of node_id to {name, coords}
-    """
-
     df = pd.read_csv(csv_file)
-    locations = {}
     G = nx.Graph()
+    locations = {}
 
-    # Step 1: Load and shift longitudes (for Pacific view)
     for _, row in df.iterrows():
-        node_id = row["Node ID"]
-        lat, lon = row["Latitude"], row["Longitude"]
-        if lon < 0:
-            lon += 360
-        coords = (lat, lon)
-        name = row["Node Name"]
-        locations[node_id] = {"name": name, "coords": coords}
-        G.add_node(node_id, name=name, coords=coords)
+        node_id = row['Node ID']
+        G.add_node(node_id,
+                   name=row['Node Name'],
+                   coords=(row['Latitude'], row['Longitude']),
+                   population=row['Population'])  # <-- NEW population attribute
+        locations[node_id] = {
+            'name': row['Node Name'],
+            'coords': (row['Latitude'], row['Longitude']),
+            'population': row['Population']  # <-- Also store it here
+        }
 
-    # Step 2: Add weighted edges (distance in km)
-    node_ids = list(locations.keys())
-    for i in range(len(node_ids)):
-        for j in range(i + 1, len(node_ids)):
-            n1, n2 = node_ids[i], node_ids[j]
-            c1, c2 = locations[n1]["coords"], locations[n2]["coords"]
-            dist = geodesic(c1, c2).kilometers
-            G.add_edge(n1, n2, weight=dist)
+    # Add edges based on distances
+    nodes = list(locations.keys())
+    for i in range(len(nodes)):
+        for j in range(i + 1, len(nodes)):
+            node1, node2 = nodes[i], nodes[j]
+            dist = haversine(locations[node1]['coords'], locations[node2]['coords'])
+            G.add_edge(node1, node2, weight=dist)
 
     return G, locations

@@ -21,5 +21,6 @@ for scenario in scenarios:
 
 # Step 4: Save summary
 df = pd.DataFrame(results)
-df.to_csv("batch_summary.csv", index=False)
-print("Batch summary saved as batch_summary.csv")
+output_path = "disaster_logistics_model/output/batch_summary.csv"
+df.to_csv(output_path, index=False)
+print(f"Batch summary saved to {output_path}")
