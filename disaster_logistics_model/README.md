@@ -1,72 +1,74 @@
-~~# Disaster Logistics Modeling Framework
+# Disaster Logistics Modeling Framework
 
-This repository contains a modular and extensible framework for modeling prepositioning and delivery of humanitarian assistance commodities (e.g., food and water) in the aftermath of disasters. The system simulates disaster scenarios and solves deterministic optimization models using Gurobi. Future versions will include two-stage stochastic extensions.
+This repository contains a modular, extensible framework for modeling the prepositioning and delivery of humanitarian aid (e.g., food and water) in response to simulated disasters across the Pacific region. The system integrates scenario simulation and deterministic optimization, producing both analytical outputs and visualizations.
 
 ## Project Structure
 
 ```
 disaster_logistics_model/
-├── config/
-│   └── model_parameters.yaml         # Centralized configuration for parameters (dials/levers)
-├── data/
-│   └── pacific_cities.csv            # Location data for network nodes
-├── monte_carlo/
-│   └── simulator.py                  # Scenario generator based on disaster types and severity
-├── network/
-│   └── network_builder.py            # Constructs geospatial graph and arc distances
-├── optimization/
-│   ├── deterministic_model.py        # Deterministic MIP model with vehicle and inventory tracking
-│   ├── stochastic_model.py           # Placeholder for future 2-stage stochastic model
-│   └── run_batch_optimization.py     # Batch execution for all scenarios
-├── visualization/
-│   └── flow_map.py                   # (Optional) For generating maps and plots
-├── main.py                           # Entry point if needed
-├── requirements.txt                  # Python dependencies
-└── README.md                         # Project documentation
+├── config/                     # Parameter loader and YAML config
+├── data/                       # Location and network datasets
+├── monte_carlo/                # Scenario generator
+├── network/                    # Network graph builder
+├── optimization/               # Gurobi models (deterministic)
+├── visualization/              # Charts and map output
+├── output/                     # Results and plots
+control_tower.py                # Main entry point to run entire system
+```
+
+## Requirements
+
+- Python 3.9+
+- Gurobi + gurobipy
+- matplotlib, pandas, folium, networkx, pyyaml
+
+Install with:
+
+```bash
+pip install -r requirements.txt
 ```
 
 ## Quick Start
 
-1. **Build the network**:
-   ```python
-   from disaster_logistics_model.network.network_builder import build_geospatial_network
-   G, locations = build_geospatial_network("disaster_logistics_model/data/pacific_cities.csv")
-   ```
+To run the full system:
 
-2. **Generate scenarios**:
-   ```python
-   from disaster_logistics_model.monte_carlo.simulator import generate_scenarios
-   scenarios = generate_scenarios(G, locations, num_scenarios=100)
-   ```
+```bash
+python control_tower.py
+```
 
-3. **Run deterministic optimization**:
-   ```python
-   from disaster_logistics_model.optimization.deterministic_model import solve_deterministic_vrp_with_aps
-   result = solve_deterministic_vrp_with_aps(scenarios[0])
-   ```
+This will:
+- Build the network
+- Generate simulated disaster scenarios
+- Solve optimization models
+- Save batch summary results
+- Generate visualizations
 
-4. **Batch process scenarios**:
-   ```bash
-   python -m disaster_logistics_model.optimization.run_batch_optimization
-   ```
+## Key Outputs
+
+- `output/batch_summary.csv`: Scenario-level results including demand, objective value, APS locations, and composite strategy scores
+- `output/aps_frequency_chart.png`: Bar chart of how often each node was selected as an APS site
+- `output/objective_values_chart.png`: Objective value per scenario
+- `output/severity_vs_objective.png`: Scatter plot comparing disaster severity and cost
+- `output/3d_severity_objective_connectivity.png`: 3D scatter of severity, objective, and network connectivity
+- `output/interactive_3d_severity_objective_connectivity.html`: Interactive Plotly 3D chart of severity vs. objective vs. connectivity
+- `output/aps_selection_map.html`: Map showing APS site frequency
+- `output/epicenter_objective_map.html`: Map visualizing objective value based on epicenter location
+- `output/composite_score_map.html`: Map of APS nodes color-coded by average composite strategy score
 
 ## Parameter Configuration
 
-Edit `disaster_logistics_model/config/model_parameters.yaml` to tune model behavior:
-- `commodities`: Commodity types (e.g., food, water)
-- `arc_capacity`: Base and severity multiplier for arc capacities
-- `default_disaster`: Severity and affected radius settings
-- `seed`: Random seed for reproducibility
+All simulation, model, and visualization settings are configured in:
 
-## Notes
-- Built with extensibility in mind for disaster type, severity distributions, vehicle/commodity scaling.
-- All modules are designed for reuse and clarity across network, simulation, optimization, and visualization stages.
-- Model currently solves with Gurobi 11.0.3. Ensure `gurobipy` is installed and licensed.
+```
+disaster_logistics_model/config/model_parameters.yaml
+```
 
-## Coming Soon
-- Two-stage stochastic version
-- GUI interface for configuration
-- Interactive dashboards and map overlays
+Additional strategic scoring parameters:
+- `config/political_scores.yaml`: Optional geopolitical scoring input for composite strategy analysis
 
----
+## Roadmap
 
+- Two-stage stochastic optimization extension
+- Expanded disaster event library (earthquakes, tsunamis, conflict)
+- Dynamic vehicle and routing constraints
+- Web dashboard for scenario comparison and strategy exploration

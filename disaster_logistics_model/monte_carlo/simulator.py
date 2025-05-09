@@ -16,6 +16,11 @@ def generate_scenarios(G, locations, num_scenarios=None):
 
     for sid in range(num_scenarios):
         epicenter = random.choice(node_list)
+        radius_km = sim_params["disaster_radius_km"]
+        num_neighbors = sum(
+            1 for neighbor in G.neighbors(epicenter)
+            if haversine(locations[epicenter]["coords"], locations[neighbor]["coords"]) <= radius_km
+        )
         severity = max(0.1, random.gauss(
             sim_params["severity_distribution"]["mean"],
             sim_params["severity_distribution"]["std_dev"]
@@ -48,6 +53,7 @@ def generate_scenarios(G, locations, num_scenarios=None):
         scenario = {
             "scenario_id": sid,
             "epicenter": epicenter,
+            "epicenter_neighbors": num_neighbors,
             "severity": severity,
             "affected_nodes": affected_nodes,
             "demand": demand,

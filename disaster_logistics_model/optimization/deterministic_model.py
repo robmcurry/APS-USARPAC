@@ -1,5 +1,7 @@
 # deterministic_model.py
 
+import yaml
+
 from gurobipy import Model, GRB, quicksum
 from collections import defaultdict
 
@@ -36,10 +38,30 @@ def solve_deterministic_vrp_with_aps(scenario, time_periods=range(1, 6), vehicle
     bar_x = model.addVars(arc_list, time_period_list, vehicle_list, vtype=GRB.BINARY, name="bar_x")
     bar_w = model.addVars(node_list, time_period_list2, vehicle_list, vtype=GRB.BINARY, name="bar_w")
 
+    # Load objective weights from YAML config
+    with open("disaster_logistics_model/config/model_parameters.yaml", "r") as f:
+        param_config = yaml.safe_load(f)
+    weights = param_config.get("objective_weights", {})
+    w_demand = weights.get("unmet_demand", 1.0)
+    w_safety = weights.get("safety_stock", 1.0)
+    w_inventory = weights.get("prepositioning", 1.0)
+
+    # Estimate normalization constants
+    total_demand = sum(scenario["demand"].values())
+    demand_norm = max(1, total_demand)
+    safety_norm = max(1, len(node_list) * len(commodity_list) * len(time_period_list))
+    q_norm = max(1, len(node_list) * len(commodity_list) * 100)  # assumes q[i,c] ≤ 100 typically
+
+    # Define normalized terms
+    normalized_unmet_demand = quicksum(z[i, c, t] for i in node_list for c in commodity_list for t in time_period_list) / demand_norm
+    normalized_safety_penalty = quicksum(alpha[i, c] for i in node_list for c in commodity_list) / safety_norm
+    normalized_q_cost = quicksum(q[i, c] for i in node_list for c in commodity_list) / q_norm
+
+    # Apply weights to normalized terms
     model.setObjective(
-        quicksum(z[i, c, t] for i in node_list for c in commodity_list for t in time_period_list) +
-        quicksum(alpha[i, c] for i in node_list for c in commodity_list) +
-        0.001 * quicksum(q[i, c] for i in node_list for c in commodity_list),
+        w_demand * normalized_unmet_demand +
+        w_safety * normalized_safety_penalty +
+        w_inventory * normalized_q_cost,
         GRB.MINIMIZE
     )
 
@@ -98,6 +120,32 @@ def solve_deterministic_vrp_with_aps(scenario, time_periods=range(1, 6), vehicle
         if val > 0:
             flow_summary[(i, j)] += val
 
+    # Load political scores
+    with open("disaster_logistics_model/config/political_scores.yaml", "r") as f:
+        political_scores = yaml.safe_load(f)
+
+    selected_aps = [i for i in node_list if p[i].x > 0.5]
+    avg_political_score = (
+        sum(political_scores.get(i, 0) for i in selected_aps) / max(1, len(selected_aps))
+    )
+
+    # Calculate total demand
+    total_demand = sum(scenario["demand"].values())
+    normalized_risk = (model.ObjVal if model.Status == GRB.OPTIMAL else 0) / max(1, total_demand)
+
+    # Normalize cost using objective across demand scale
+    normalized_cost = (model.ObjVal if model.Status == GRB.OPTIMAL else 0) / 1e9  # or use max across runs
+
+    # Invert political score for scoring (higher is better, so subtract from 10)
+    political_component = 10 - avg_political_score
+
+    # Weight parameters for composite scoring
+    w_risk = 0.5
+    w_cost = 0.3
+    w_political = 0.2
+
+    composite_score = w_risk * normalized_risk + w_cost * normalized_cost + w_political * political_component
+
     results = {
         "scenario_id": scenario["scenario_id"],
         "objective": model.ObjVal if model.Status == GRB.OPTIMAL else None,
@@ -110,7 +158,16 @@ def solve_deterministic_vrp_with_aps(scenario, time_periods=range(1, 6), vehicle
         "q_full": {(i, c): q[i, c].x for i in node_list for c in commodity_list},
         "initial_inventory": {(i, c): w[i, c, 0].x for i in node_list for c in commodity_list if w[i, c, 0].x > 0},
         "w_full": {(i, c, t): w[i, c, t].x for i in node_list for c in commodity_list for t in time_period_list2},
-        "flow_summary": dict(flow_summary)
+        "flow_summary": dict(flow_summary),
+        "severity": scenario.get("severity"),
+        "epicenter": scenario.get("epicenter"),
+        "epicenter_neighbors": scenario.get("epicenter_neighbors"),
+        "affected_nodes": scenario.get("affected_nodes"),
+        "demand": scenario.get("demand"),
+        "supply": scenario.get("supply"),
+        "capacity": scenario.get("capacity"),
+        "avg_political_score": avg_political_score,
+        "composite_score": composite_score,
     }
 
     return results
@@ -120,7 +177,11 @@ if __name__ == "__main__":
         "scenario_id": 0,
         "demand": {(1, 'food'): 100, (2, 'water'): 200},
         "supply": {(1, 'food'): 150, (2, 'water'): 250},
-        "capacity": {(1, 2, 'food'): 300, (2, 1, 'water'): 300}
+        "capacity": {(1, 2, 'food'): 300, (2, 1, 'water'): 300},
+        "severity": 2.0,
+        "epicenter": 1,
+        "epicenter_neighbors": 2,
+        "affected_nodes": [1, 2],
     }
 
     result = solve_deterministic_vrp_with_aps(dummy_scenario)

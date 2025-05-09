@@ -1,0 +1,11 @@
+# Political influence or strategic value scores for each node
+# Values range from 1 (low political value) to 10 (high political value)
+
+1: 9    # Guam
+2: 4    # Saipan
+3: 8    # Hawaii
+4: 3    # Small island
+5: 7    # Philippines
+6: 5    # Australia
+7: 6    # Indonesia
+8: 2    # Unaligned region

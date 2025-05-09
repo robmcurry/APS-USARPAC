@@ -40,3 +40,10 @@ visualization:
 output:
   batch_summary_file: "disaster_logistics_model/output/batch_summary.csv"
   scenario_maps_folder: "disaster_logistics_model/output/scenario_maps"
+
+
+# Objective weights for optimization
+objective_weights:
+  unmet_demand: 1.0
+  safety_stock: 1.0
+  prepositioning: 1.0
