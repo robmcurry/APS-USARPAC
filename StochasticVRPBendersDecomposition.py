@@ -1,6 +1,6 @@
 
-### Complete Code Expansion
 
+### Complete Code Expansion
 # Below is the continuation of the skeleton and full implementation:
 import random
 import gurobipy as gp
@@ -9,20 +9,35 @@ from gurobipy import GRB
 
 def solve_stochastic_vrp_benders():
 
-    # Data initialization
-    time_period_list = range(1, 6)  # Time periods 1 to 10
-    vehicle_list = range(1, 6)  # Vehicles 1 to 10
-    arc_list = random.sample([(i, j) for i in range(1, 6) for j in range(1, 6) if i != j], 20)
-    node_list = list(range(1, 6))  # Nodes 1 to 50
-    commodity_list = [f"Commodity{k}" for k in range(1, 6)]  # Commodities 1 to 10
-    scenario_list = range(1, 6)  # Scenarios 1 to 15
 
+
+
+    num_time_periods = 5
+    num_nodes = 20  # Number of nodes
+    num_vehicles = 20  # Number of vehicles
+    num_commodities = 10  # Number of commodities
+    num_scenarios = 2  # Number of scenarios
+
+    # Data initialization
+    time_period_list = range(1, num_time_periods)  # Time periods 1 to 10
+    vehicle_list = range(1, num_time_periods)  # Vehicles 1 to 10
+    arc_list = random.sample([(i, j) for i in range(1, num_nodes) for j in range(1, num_nodes) if i != j], 60)
+    node_list = list(range(1, num_nodes))  # Nodes 1 to 50
+    commodity_list = [f"Commodity{k}" for k in range(1, num_commodities)]  # Commodities 1 to 10
+    scenario_list = range(1, num_scenarios+1)  # Scenarios 1 to 15
+    # print(scenario_list)
     print(arc_list)
     # Parameters (same as before)
-    phi = {s: 1 / len(scenario_list) for s in scenario_list}  # Uniform scenario probabilities
+    phi = {s: 1 / (len(scenario_list)) for s in scenario_list}  # Uniform scenario probabilities
+    # print("phi 1", phi)
     delta = {
         (i, c, t, s): 5000 * ((i + t + s) % 10 + 1)
         for i in node_list for c in commodity_list for t in time_period_list for s in scenario_list
+    }
+
+    delta2 = {
+        (i, c, s): 5000 * ((i + s) % 10 + 1)
+        for i in node_list for c in commodity_list for s in scenario_list
     }
 
     # Create the master problem
@@ -35,13 +50,14 @@ def solve_stochastic_vrp_benders():
     
     
     theta = master.addVar(name="theta", lb=0)
-    L = {f"Commodity{k}": 2 for k in range(1, 6)}
-    P = 10
+    L = {f"Commodity{k}": 2 for k in range(1, num_commodities)}
+    P = 8
 
     ell = {(i, c): 1 for i in node_list for c in commodity_list}
-    M_node = {(i, t): 2500 for i in node_list for t in time_period_list}
+    M_node = {(i, t): 20 for i in node_list for t in time_period_list}
+
     d = {
-        (i, c, t): (i + t) % 3 * 5 for i in node_list for c in commodity_list for t in time_period_list
+        (i, c, t): 30 + ((i + t) % 11) for i in node_list for c in commodity_list for t in time_period_list
     }
     # Master objective
     master.setObjective(theta,
@@ -52,7 +68,7 @@ def solve_stochastic_vrp_benders():
     master.addConstr(gp.quicksum(m_i[i] for i in node_list) <= 8, "MaxVehicles")
     master.addConstr(gp.quicksum(p[i] for i in node_list) <= P, "MaxAPSLocationsLimit")
     master.addConstr(gp.quicksum(p[i] for i in node_list) <= 8, "MaxAPSLocations")
-    master.addConstrs((q[i, c] <= 1000 * r[i, c] for i in node_list for c in commodity_list), "RestrictedAPS")
+    master.addConstrs((q[i, c] <= 25 * r[i, c] for i in node_list for c in commodity_list), "RestrictedAPS")
     master.addConstrs((gp.quicksum(q[i, c] for c in commodity_list) <= 2000 for i in node_list), "MaxCommodityPerNode")
 
     master.addConstrs((r[i, c] <= p[i] for i in node_list for c in commodity_list), "RestrictedAssignment")
@@ -65,7 +81,7 @@ def solve_stochastic_vrp_benders():
 
     # Benders decomposition
     max_iters = 300
-    tol = 1e-4
+    tol = 1e-8
     iteration = 0
 
     converged = False
@@ -74,6 +90,7 @@ def solve_stochastic_vrp_benders():
         print(f"Starting Benders iteration: {iteration + 1}")
         master.optimize()
 
+        print("phi 1", phi)
         if master.status == GRB.OPTIMAL:
             print(f"Objective function value of the master problem: {master.objVal}")
             print(f"Objective function value: {master.getObjective().getValue()}")
@@ -87,19 +104,18 @@ def solve_stochastic_vrp_benders():
         p_sol = {i: p[i].x for i in node_list}
         r_sol = {i: {c: r[i, c].x for c in commodity_list} for i in node_list}
 
-        
+        print("phi 1", phi)
 
         print("Positive variable values from the master problem:")
-        positive_vars_master = {var.VarName: var.X for var in master.getVars() if var.X > 0}
-        for var_name, var_value in positive_vars_master.items():
-            print(f"{var_name}: {var_value:.2f}")
+        # positive_vars_master = {var.VarName: var.X for var in master.getVars() if var.X > 0}
+        # for var_name, var_value in positive_vars_master.items():
+        #     print(f"{var_name}: {var_value:.2f}")
 
         # Solve subproblems for all scenarios
         subproblem_costs = []
         infeasible_scenarios = []
         # for s in scenario_list:
-        subproblem, subproblem_cost = solve_subproblem(
-                m_i_sol, q_sol, p_sol, r_sol, node_list, commodity_list, time_period_list, arc_list, vehicle_list,d, M_node,ell
+        subproblem, subproblem_cost = solve_subproblem(num_commodities,num_nodes, num_scenarios, num_time_periods, m_i_sol, q_sol, p_sol, r_sol, node_list, commodity_list, time_period_list, arc_list, vehicle_list,d, M_node,ell,delta, delta2, phi
         )
 
         if subproblem_cost == float('inf'):  # Subproblem infeasible
@@ -111,88 +127,100 @@ def solve_stochastic_vrp_benders():
 
             for constr in subproblem.getConstrs():
                 if constr.IISConstr:
-                    extreme_rays[constr.ConstrName] = constr.Pi
+                    # extreme_rays[constr.ConstrName] = constr.Pi
                     print(f"Constraint {constr.ConstrName} has an extreme ray value of {constr.Pi}.")
+                    value = constr.Pi
 
             # Add feasibility cut (to be customized as needed)
 
             dual_demand = {
-                (i, c, t, s): subproblem.getConstrByName(f"DemandConstraints[{i},{c},{t},{s}]").Pi
+                (i, c, t, s): subproblem.getConstrByName(
+                    f"DemandConstraints[{i},{c},{t},{s}]").Pi if subproblem.getConstrByName(
+                    f"DemandConstraints[{i},{c},{t},{s}]").IISConstr else 0
                 for i in node_list
                 for c in commodity_list
                 for t in time_period_list
                 for s in scenario_list
             }
-
+            
             dual_capacity = {
-                (i, t, s): subproblem.getConstrByName(f"MaxNodeCap[{i},{t},{s}]").Pi
+                (i, t, s): subproblem.getConstrByName(f"MaxNodeCap[{i},{t},{s}]").Pi if subproblem.getConstrByName(
+                    f"MaxNodeCap[{i},{t},{s}]").IISConstr else 0
                 for i in node_list
                 for t in time_period_list
                 for s in scenario_list
             }
 
-            print("output dual capacity", dual_capacity)
+            # print("output dual capacity", dual_capacity)
             dual_start_inventory = {
-                (i, c, s): subproblem.getConstrByName(f"StartingInventory[{i},{c},{s}]").Pi
+                (i, c, s): subproblem.getConstrByName(
+                    f"StartingInventory[{i},{c},{s}]").Pi if subproblem.getConstrByName(
+                    f"StartingInventory[{i},{c},{s}]").IISConstr else 0
                 for i in node_list
                 for c in commodity_list
                 for s in scenario_list
             }
-            print("output dual start inventory", dual_start_inventory)
+            # print("output dual start inventory", dual_start_inventory)
             dual_vehicle_start_inventory = {
-                (i, s): subproblem.getConstrByName(f"VehicleStartingInventory[{i},{s}]").Pi
+                (i, s): subproblem.getConstrByName(
+                    f"VehicleStartingInventory[{i},{s}]").Pi if subproblem.getConstrByName(
+                    f"VehicleStartingInventory[{i},{s}]").IISConstr else 0
                 for i in node_list
                 for s in scenario_list
-
             }
 
-            print("output dual vehicle start inventory", dual_vehicle_start_inventory)
+            # print("output dual vehicle start inventory", dual_vehicle_start_inventory)
             dual_max_node_cap = {
-                (i, t, s): subproblem.getConstrByName(f"MaxNodeCap[{i},{t},{s}]").Pi
+                (i, t, s): subproblem.getConstrByName(f"MaxNodeCap[{i},{t},{s}]").Pi if subproblem.getConstrByName(
+                    f"MaxNodeCap[{i},{t},{s}]").IISConstr else 0
                 for i in node_list
                 for t in time_period_list
                 for s in scenario_list
             }
-            print("output dual max node cap", dual_max_node_cap)
+            # print("output dual max node cap", dual_max_node_cap)
 
             # dual_safety
 
             dual_safety = {
-                (i, c, s): subproblem.getConstrByName(f"SafetyStockConstraint[{i},{c},{s}]").Pi
+                (i, c, s): subproblem.getConstrByName(
+                    f"SafetyStockConstraint[{i},{c},{s}]").Pi if subproblem.getConstrByName(
+                    f"SafetyStockConstraint[{i},{c},{s}]").IISConstr else 0
                 for i in node_list
                 for c in commodity_list
                 for s in scenario_list
             }
             # print("output dual safety", dual_safety)
             dual_vehicle_return = {
-                (i, s): subproblem.getConstrByName(f"VehiclesReturn[{i},{s}]").Pi
+                (i, s): subproblem.getConstrByName(f"VehiclesReturn[{i},{s}]").Pi if subproblem.getConstrByName(
+                    f"VehiclesReturn[{i},{s}]").IISConstr else 0
                 for i in node_list
                 for s in scenario_list
             }
             # print("output dual vehicle return", dual_vehicle_return)
             # Construct the optimality cut
-            feasibility_cut = (gp.quicksum(
-                dual_demand[i, c, t, s] * d.get((i, c, s), 0) for i in node_list for c in commodity_list for s in
-                scenario_list for t in time_period_list)
-                              + gp.quicksum(
-                        M_node.get((i, t), 0) * dual_capacity[i, t, s] for i in node_list for t in time_period_list for
-                        s in scenario_list)
-                              + gp.quicksum((ell.get((i, c), 0) - q[i, c]) * dual_safety[i, c, s]
-                                            for i in node_list for c in commodity_list for s in scenario_list)
-                              + gp.quicksum(
-                        dual_start_inventory[i, c, s] * q[i, c] for i in node_list for c in commodity_list for s in
-                        scenario_list)
-                              + gp.quicksum(
-                        dual_vehicle_return[i, s] * m_i[i] for i in node_list for s in scenario_list)
-                              + gp.quicksum(
-                        dual_vehicle_start_inventory[i, s] * m_i[i] for i in node_list for s in scenario_list)
-                              )
+
+            feasibility_cut = {}
+            for s in scenario_list:
+                feasibility_cut[s] = (gp.quicksum(
+                    dual_demand[i, c, t, s] * d.get((i, c, s), 0) for i in node_list for c in commodity_list for t in time_period_list)
+                                  + gp.quicksum(
+                            M_node.get((i, t), 0) * dual_capacity[i, t, s] for i in node_list for t in time_period_list )
+                                  + gp.quicksum((ell.get((i, c), 0) - q[i, c]) * dual_safety[i, c, s]
+                                                for i in node_list for c in commodity_list )
+                                  + gp.quicksum(
+                            dual_start_inventory[i, c, s] * q[i, c] for i in node_list for c in commodity_list )
+                                  + gp.quicksum(
+                            dual_vehicle_return[i, s] * m_i[i] for i in node_list)
+                                  + gp.quicksum(
+                            dual_vehicle_start_inventory[i, s] * m_i[i] for i in node_list )
+                                  )
 
 
             # Ensure master variable theta bounds the subproblem cost
-            master.addConstr(0 >= feasibility_cut, name=f"FeasibilityCut")
+            master.addConstr(0 >= gp.quicksum(phi[s]*feasibility_cut[s] for s in scenario_list), name=f"FeasibilityCut")
         else:
 
+            print("Subproblem is feasible.")
             dual_demand = {
                 (i, c,t, s): subproblem.getConstrByName(f"DemandConstraints[{i},{c},{t},{s}]").Pi
                 for i in node_list
@@ -201,7 +229,7 @@ def solve_stochastic_vrp_benders():
                 for s in scenario_list
             }
 
-            print("output dual demand",dual_demand)
+            # print("output dual demand",dual_demand)
             dual_capacity = {
                 (i, t, s): subproblem.getConstrByName(f"MaxNodeCap[{i},{t},{s}]").Pi
                 for i in node_list
@@ -209,14 +237,14 @@ def solve_stochastic_vrp_benders():
                 for s in scenario_list
             }
 
-            print("output dual capacity",dual_capacity)
+            # print("output dual capacity",dual_capacity)
             dual_start_inventory = {
                 (i, c, s): subproblem.getConstrByName(f"StartingInventory[{i},{c},{s}]").Pi
                 for i in node_list
                 for c in commodity_list
                 for s in scenario_list
             }
-            print("output dual start inventory",dual_start_inventory)
+            # print("output dual start inventory",dual_start_inventory)
             dual_vehicle_start_inventory = {
                 (i, s): subproblem.getConstrByName(f"VehicleStartingInventory[{i},{s}]").Pi
                 for i in node_list
@@ -224,48 +252,55 @@ def solve_stochastic_vrp_benders():
 
             }
 
-            print("output dual vehicle start inventory",dual_vehicle_start_inventory)
+            # print("output dual vehicle start inventory",dual_vehicle_start_inventory)
             dual_max_node_cap = {
                 (i, t, s): subproblem.getConstrByName(f"MaxNodeCap[{i},{t},{s}]").Pi
                 for i in node_list
                 for t in time_period_list
                 for s in scenario_list
             }
-            print("output dual max node cap",dual_max_node_cap)
+            # print("output dual max node cap",dual_max_node_cap)
 
             # dual_safety
-
-
             dual_safety = {
                 (i, c, s): subproblem.getConstrByName(f"SafetyStockConstraint[{i},{c},{s}]").Pi
                 for i in node_list
                 for c in commodity_list
                 for s in scenario_list
             }
-            print("output dual safety",dual_safety)
+            # print("output dual safety",dual_safety)
             dual_vehicle_return = {
                 (i,s): subproblem.getConstrByName(f"VehiclesReturn[{i},{s}]").Pi
                 for i in node_list
                 for s in scenario_list
             }
-            print("output dual vehicle return",dual_vehicle_return)
+
+            print("phi value ", phi)
+            # print("output dual vehicle return",dual_vehicle_return)
             # Construct the optimality cut
-            optimality_cut = (gp.quicksum(
-                  dual_demand[i, c,t, s] * d.get((i, c, s), 0) for i in node_list for c in commodity_list for s in scenario_list for t in time_period_list)
-                    + gp.quicksum(M_node.get((i,t),0)*dual_capacity[i,t,s] for i in node_list for t in time_period_list for s in scenario_list)
-                      + gp.quicksum((ell.get((i,c),0)-q[i, c])*dual_safety[i, c, s]
-                                    for i in node_list for c in commodity_list for s in scenario_list)
-                              + gp.quicksum(dual_start_inventory[i, c, s] * q[i, c] for i in node_list for c in commodity_list for s in scenario_list)
-                              + gp.quicksum(dual_vehicle_return[i,s]*m_i[i] for i in node_list for s in scenario_list)
-                              + gp.quicksum(dual_vehicle_start_inventory[i,s]*m_i[i] for i in node_list for s in scenario_list)
-            )
+            optimality_cut = {}
+            for s in scenario_list:
+                optimality_cut[s] = (gp.quicksum(
+                      dual_demand[i, c, t, s] * d.get((i, c, s), 0) for i in node_list for c in commodity_list for t in time_period_list)
+                        + gp.quicksum(M_node.get((i,t),0)*dual_capacity[i,t,s] for i in node_list for t in time_period_list)
+                          + gp.quicksum((ell.get((i,c),0) - q[i, c])*dual_safety[i, c, s]
+                                        for i in node_list for c in commodity_list)
+                                  + gp.quicksum(dual_start_inventory[i, c, s] * q[i, c] for i in node_list for c in commodity_list )
+                                  + gp.quicksum(dual_vehicle_return[i,s]*m_i[i] for i in node_list)
+                                  + gp.quicksum(dual_vehicle_start_inventory[i,s]*m_i[i] for i in node_list )
+                )
 
             # Ensure master variable theta bounds the subproblem cost
-            master.addConstr(theta >= optimality_cut, name=f"OptimalityCut")
+            print("scenario list", scenario_list)
+            for s in scenario_list:
+                print("scenario ", s, " ", phi[s])
+            master.addConstr(theta >= gp.quicksum(phi[s]*optimality_cut[s] for s in scenario_list), name=f"OptimalityCut")
             theta_value = theta.x
 
         # Check convergence
-        approx_cost = sum(phi[s] * subproblem_cost for s in scenario_list)
+
+        print("phi 1", phi)
+        approx_cost = subproblem_cost
 
         print(f"Iteration {iteration + 1}: Theta = {theta_value}, Approx = {approx_cost}")
         print(f"Master objective function value: {master.objVal}")
@@ -283,24 +318,24 @@ def solve_stochastic_vrp_benders():
             for c in commodity_list:
                 print(f"q[{i}, {c}] = {q_sol[i][c]:.2f}, r[{i}, {c}] = {r_sol[i][c]:.2f}")
 
-        print("Positive variable values:")
-        positive_vars = {var.VarName: var.X for var in master.getVars() if var.X > 0}
-        for var_name, var_value in positive_vars.items():
-            print(f"{var_name}: {var_value:.2f}")
+        # print("Positive variable values:")
+        # positive_vars = {var.VarName: var.X for var in master.getVars() if var.X > 0}
+        # for var_name, var_value in positive_vars.items():
+        #     print(f"{var_name}: {var_value:.2f}")
 
 
 
 # ```python
-def solve_subproblem(m_i, q, p, r, node_list, commodity_list, time_period_list, arc_list,vehicle_list,d,M_node,ell):
+def solve_subproblem(num_commodities, num_nodes, num_scenarios,num_time_periods, m_i, q, p, r, node_list, commodity_list, time_period_list, arc_list,vehicle_list,d,M_node,ell,delta,delta2,phi):
     subproblem = gp.Model(f"Subproblem_Scenario")
-    subproblem.Params.OutputFlag = 0
-    scenario_list = range(1, 6)  # Scenarios 1 to 10
-    time_period_list2 = range(0, 6)  # Time periods 0 to 10
+    # subproblem.Params.OutputFlag = 0
+    scenario_list = range(1, num_scenarios+1)  # Scenarios 1 to 10
+    time_period_list2 = range(0, num_time_periods)  # Time periods 0 to 10
 
 
 
-    b = {f"Commodity{k}": 1 for k in range(1, 6)}
-    mu = {i: 30000 for i in range(1, 6)}
+    b = {f"Commodity{k}": 1 for k in range(1, num_commodities)}
+    mu = {i: 30000 for i in range(1, num_nodes)}
 
     # Add second-stage decision variables (flow, inventory, unmet demand, etc.)
     x = subproblem.addVars(arc_list, commodity_list, time_period_list,vehicle_list, scenario_list, name="x", lb=0)
@@ -313,15 +348,18 @@ def solve_subproblem(m_i, q, p, r, node_list, commodity_list, time_period_list, 
     bar_w = subproblem.addVars(node_list, time_period_list2, vehicle_list, scenario_list, name="bar_w", lb=0, ub=1)
 
     # Subproblem objective
-    delta = 5000  # Example, replace with actual data
+    # delta = 5000  # Example, replace with actual data
     subproblem.setObjective(
-        gp.quicksum(delta * z[i, c, t,s] for i in node_list for c in commodity_list for t in time_period_list for s in scenario_list),
+        gp.quicksum(
+            phi[s]*gp.quicksum(delta[i, c, t,s] * z[i, c, t,s] for i in node_list for c in commodity_list for t in time_period_list)
+            + phi[s]*gp.quicksum(delta2[i,c,s]*alpha[i,c,s] for i in node_list for c in commodity_list )
+            for s in scenario_list),
         GRB.MINIMIZE
     )
 
     subproblem.addConstrs(
         (
-            gp.quicksum(y[i, c, t, s] for t in range(1, t + 1)) + z[i, c, t, s] == d.get((i, c, s), 0)
+            gp.quicksum(y[i, c, tprime, s] for tprime in range(1, t + 1)) + z[i, c, t, s] == d.get((i, c, s), 0)
             for i in node_list
             for c in commodity_list
             for t in time_period_list
@@ -366,14 +404,14 @@ def solve_subproblem(m_i, q, p, r, node_list, commodity_list, time_period_list, 
         (
             alpha[i, c, s] >= ell.get((i, c), 0) - (
                     q[i][c]
-                    - gp.quicksum(
+                    - (gp.quicksum(
                 x[i, j, c, t, v, s] for j in node_list if (i, j) in arc_list for t in time_period_list for v in
                 vehicle_list
             )
                     - gp.quicksum(
                 x[j, i, c, t, v, s] for j in node_list if (j, i) in arc_list for t in time_period_list for v in
                 vehicle_list
-            )
+            ))
             )
             for i in node_list
             for c in commodity_list
@@ -438,10 +476,14 @@ def solve_subproblem(m_i, q, p, r, node_list, commodity_list, time_period_list, 
 
     subproblem.optimize()
 
-    # print("output subproblem objective value", subproblem.ObjVal)
     if subproblem.status == GRB.INFEASIBLE:
+        print("Subproblem is infeasible.")
+
         return subproblem, float('inf')  # Indicates infeasibility
     else:
+
+        print("Subproblem objective value:", subproblem.ObjVal)
+
         positive_z_vars = {z[i, c, t, s].VarName: z[i, c, t, s].X for i in node_list for c in commodity_list for t in
                            time_period_list for s in scenario_list if z[i, c, t, s].X > 0}
         print("Positive z variable values:")
@@ -450,15 +492,22 @@ def solve_subproblem(m_i, q, p, r, node_list, commodity_list, time_period_list, 
 
         positive_y_vars = {y[i, c, t, s].VarName: y[i, c, t, s].X for i in node_list for c in commodity_list for t in
                            time_period_list for s in scenario_list if y[i, c, t, s].X > 0}
-        print("Positive y variable values:")
-        for var_name, var_value in positive_y_vars.items():
-            print(f"{var_name}: {var_value:.2f}")
+        # print("Positive y variable values:")
+        # for var_name, var_value in positive_y_vars.items():
+        #     print(f"{var_name}: {var_value:.2f}")
 
         positive_x_vars = {x[i, j, c, t, v, s].VarName: x[i, j, c, t, v, s].X for i, j in arc_list for c in
                            commodity_list for t in
                            time_period_list for v in vehicle_list for s in scenario_list if x[i, j, c, t, v, s].X > 0}
-        print("Positive x variable values:")
-        for var_name, var_value in positive_x_vars.items():
+        # print("Positive x variable values:")
+        # for var_name, var_value in positive_x_vars.items():
+        #     print(f"{var_name}: {var_value:.2f}")
+        #
+
+        positive_alpha_vars = {alpha[i, c, s].VarName: alpha[i, c, s].X for i in node_list for c in commodity_list
+                               for s in scenario_list if alpha[i, c, s].X > 0}
+        print("Positive alpha variable values:")
+        for var_name, var_value in positive_alpha_vars.items():
             print(f"{var_name}: {var_value:.2f}")
 
         return subproblem, subproblem.ObjVal
