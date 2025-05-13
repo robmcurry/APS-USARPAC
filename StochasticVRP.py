@@ -64,6 +64,7 @@ def solve_stochastic_vrp():
                        GRB.MINIMIZE
                        )
 
+
     # Model constraints
     model.addConstr(gp.quicksum(m_i[i] for i in node_list) <= 8, "MaxVehicles")
     model.addConstr(gp.quicksum(p[i] for i in node_list) <= P, "MaxAPSLocationsLimit")
