@@ -13,10 +13,10 @@ def solve_stochastic_vrp_benders():
 
 
     num_time_periods = 5
-    num_nodes = 30  # Number of nodes
-    num_vehicles = 10  # Number of vehicles
-    num_commodities = 10  # Number of commodities
-    num_scenarios = 2  # Number of scenarios
+    num_nodes = 50  # Number of nodes
+    num_vehicles = 30  # Number of vehicles
+    num_commodities = 5  # Number of commodities
+    num_scenarios = 5  # Number of scenarios
 
     # Data initialization
     time_period_list = range(1, num_time_periods)  # Time periods 1 to 10
@@ -35,12 +35,12 @@ def solve_stochastic_vrp_benders():
     phi = {s: 1 / (len(scenario_list)) for s in scenario_list}  # Uniform scenario probabilities
     # print("phi 1", phi)
     delta = {
-        (i, c, t, s): 5000 * ((i + t + s) % 10 + 1)
+        (i, c, t, s): 5 * ((i + t + s) % 10 + 1)
         for i in node_list for c in commodity_list for t in time_period_list for s in scenario_list
     }
 
     delta2 = {
-        (i, c, s): 5000 * ((i + s) % 10 + 1)
+        (i, c, s): 5 * ((i + s) % 10 + 1)
         for i in node_list for c in commodity_list for s in scenario_list
     }
 
@@ -206,18 +206,14 @@ def solve_stochastic_vrp_benders():
             feasibility_cut = {}
             for s in scenario_list:
                 feasibility_cut[s] = (gp.quicksum(
-                    dual_demand[i, c, t, s] * d.get((i, c, s), 0) for i in node_list for c in commodity_list for t in time_period_list)
-                                   +gp.quicksum(
-                            M_node.get((i, t), 0) * dual_capacity[i, t, s] for i in node_list for t in time_period_list )
-                                  + gp.quicksum((ell.get((i, c), 0) - q[i, c]) * dual_safety[i, c, s]
-                                                for i in node_list for c in commodity_list )
-                                  + gp.quicksum(
-                            dual_start_inventory[i, c, s] * q[i, c] for i in node_list for c in commodity_list )
-                                  + gp.quicksum(
-                            dual_vehicle_return[i, s] * m_i[i] for i in node_list)
-                                  + gp.quicksum(
-                            dual_vehicle_start_inventory[i, s] * m_i[i] for i in node_list )
-                                  )
+                      + dual_demand[i, c, t, s] * d.get((i, c, s), 0) for i in node_list for c in commodity_list for t in time_period_list)
+                        + gp.quicksum(M_node.get((i,t),0)*dual_capacity[i,t,s] for i in node_list for t in time_period_list)
+                          + gp.quicksum((ell.get((i,c),0) - q[i, c])*dual_safety[i, c, s]
+                                        for i in node_list for c in commodity_list)
+                                  + gp.quicksum(dual_start_inventory[i, c, s] * q[i, c] for i in node_list for c in commodity_list )
+                                  + gp.quicksum(dual_vehicle_return[i,s]*m_i[i] for i in node_list)
+                                  + gp.quicksum(dual_vehicle_start_inventory[i,s]*m_i[i] for i in node_list )
+                )
 
 
             # Ensure master variable theta bounds the subproblem cost
