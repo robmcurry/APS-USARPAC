@@ -13,15 +13,19 @@ def solve_stochastic_vrp_benders():
 
 
     num_time_periods = 5
-    num_nodes = 20  # Number of nodes
-    num_vehicles = 20  # Number of vehicles
+    num_nodes = 30  # Number of nodes
+    num_vehicles = 10  # Number of vehicles
     num_commodities = 10  # Number of commodities
     num_scenarios = 2  # Number of scenarios
 
     # Data initialization
     time_period_list = range(1, num_time_periods)  # Time periods 1 to 10
     vehicle_list = range(1, num_time_periods)  # Vehicles 1 to 10
-    arc_list = random.sample([(i, j) for i in range(1, num_nodes) for j in range(1, num_nodes) if i != j], 60)
+    # arc_list = random.sample([(i, j) for i in range(1, num_nodes) for j in range(1, num_nodes) if i != j], 30)
+
+    arc_list = [(1, 2), (1, 3), (2, 4), (3, 5), (4, 6), (5, 7), (6, 8), (7, 9), (8, 10), (9, 11),
+                (10, 12), (11, 13), (12, 14), (13, 15), (14, 16), (15, 17), (16, 18), (17, 19), (18, 20), (19, 21),
+                (20, 22), (21, 23), (22, 24), (23, 25), (24, 26), (25, 27), (26, 28), (27, 29), (28, 30), (29, 1)]
     node_list = list(range(1, num_nodes))  # Nodes 1 to 50
     commodity_list = [f"Commodity{k}" for k in range(1, num_commodities)]  # Commodities 1 to 10
     scenario_list = range(1, num_scenarios+1)  # Scenarios 1 to 15
@@ -85,7 +89,7 @@ def solve_stochastic_vrp_benders():
     iteration = 0
 
     converged = False
-
+    approx_cost = float('inf')
     while not converged and iteration < max_iters:
         print(f"Starting Benders iteration: {iteration + 1}")
         master.optimize()
@@ -104,7 +108,7 @@ def solve_stochastic_vrp_benders():
         p_sol = {i: p[i].x for i in node_list}
         r_sol = {i: {c: r[i, c].x for c in commodity_list} for i in node_list}
 
-        print("phi 1", phi)
+        # print("phi 1", phi)
 
         print("Positive variable values from the master problem:")
         # positive_vars_master = {var.VarName: var.X for var in master.getVars() if var.X > 0}
@@ -203,7 +207,7 @@ def solve_stochastic_vrp_benders():
             for s in scenario_list:
                 feasibility_cut[s] = (gp.quicksum(
                     dual_demand[i, c, t, s] * d.get((i, c, s), 0) for i in node_list for c in commodity_list for t in time_period_list)
-                                  + gp.quicksum(
+                                   +gp.quicksum(
                             M_node.get((i, t), 0) * dual_capacity[i, t, s] for i in node_list for t in time_period_list )
                                   + gp.quicksum((ell.get((i, c), 0) - q[i, c]) * dual_safety[i, c, s]
                                                 for i in node_list for c in commodity_list )
@@ -217,7 +221,7 @@ def solve_stochastic_vrp_benders():
 
 
             # Ensure master variable theta bounds the subproblem cost
-            master.addConstr(0 >= gp.quicksum(phi[s]*feasibility_cut[s] for s in scenario_list), name=f"FeasibilityCut")
+            master.addConstr(0 >= gp.quicksum(feasibility_cut[s] for s in scenario_list), name=f"FeasibilityCut")
         else:
 
             print("Subproblem is feasible.")
@@ -253,13 +257,6 @@ def solve_stochastic_vrp_benders():
             }
 
             # print("output dual vehicle start inventory",dual_vehicle_start_inventory)
-            dual_max_node_cap = {
-                (i, t, s): subproblem.getConstrByName(f"MaxNodeCap[{i},{t},{s}]").Pi
-                for i in node_list
-                for t in time_period_list
-                for s in scenario_list
-            }
-            # print("output dual max node cap",dual_max_node_cap)
 
             # dual_safety
             dual_safety = {
@@ -274,14 +271,12 @@ def solve_stochastic_vrp_benders():
                 for i in node_list
                 for s in scenario_list
             }
-
-            print("phi value ", phi)
             # print("output dual vehicle return",dual_vehicle_return)
             # Construct the optimality cut
             optimality_cut = {}
             for s in scenario_list:
                 optimality_cut[s] = (gp.quicksum(
-                      dual_demand[i, c, t, s] * d.get((i, c, s), 0) for i in node_list for c in commodity_list for t in time_period_list)
+                      + dual_demand[i, c, t, s] * d.get((i, c, s), 0) for i in node_list for c in commodity_list for t in time_period_list)
                         + gp.quicksum(M_node.get((i,t),0)*dual_capacity[i,t,s] for i in node_list for t in time_period_list)
                           + gp.quicksum((ell.get((i,c),0) - q[i, c])*dual_safety[i, c, s]
                                         for i in node_list for c in commodity_list)
@@ -291,15 +286,17 @@ def solve_stochastic_vrp_benders():
                 )
 
             # Ensure master variable theta bounds the subproblem cost
-            print("scenario list", scenario_list)
-            for s in scenario_list:
-                print("scenario ", s, " ", phi[s])
-            master.addConstr(theta >= gp.quicksum(phi[s]*optimality_cut[s] for s in scenario_list), name=f"OptimalityCut")
+
+            master.addConstr(theta >= gp.quicksum(optimality_cut[s] for s in scenario_list), name=f"OptimalityCut")
             theta_value = theta.x
 
         # Check convergence
 
-        print("phi 1", phi)
+        # print("phi 1", phi)
+        # if approx_cost == subproblem_cost:
+        #     print("OPTIMAL SOLUTION FOUND")
+        #     iteration = max_iters
+        # else:
         approx_cost = subproblem_cost
 
         print(f"Iteration {iteration + 1}: Theta = {theta_value}, Approx = {approx_cost}")
@@ -312,16 +309,11 @@ def solve_stochastic_vrp_benders():
     # Final solution extraction
     if master.status == GRB.OPTIMAL:
         print(f"Converged solution with objective: {master.objVal}")
-        print("First-stage decisions:")
-        for i in node_list:
-            print(f"m_i[{i}] = {m_i_sol[i]:.2f}, p[{i}] = {p_sol[i]:.2f}")
-            for c in commodity_list:
-                print(f"q[{i}, {c}] = {q_sol[i][c]:.2f}, r[{i}, {c}] = {r_sol[i][c]:.2f}")
-
-        # print("Positive variable values:")
-        # positive_vars = {var.VarName: var.X for var in master.getVars() if var.X > 0}
-        # for var_name, var_value in positive_vars.items():
-        #     print(f"{var_name}: {var_value:.2f}")
+        # print("First-stage decisions:")
+        # for i in node_list:
+        #     print(f"m_i[{i}] = {m_i_sol[i]:.2f}, p[{i}] = {p_sol[i]:.2f}")
+        #     for c in commodity_list:
+        #         print(f"q[{i}, {c}] = {q_sol[i][c]:.2f}, r[{i}, {c}] = {r_sol[i][c]:.2f}")
 
 
 
@@ -486,9 +478,9 @@ def solve_subproblem(num_commodities, num_nodes, num_scenarios,num_time_periods,
 
         positive_z_vars = {z[i, c, t, s].VarName: z[i, c, t, s].X for i in node_list for c in commodity_list for t in
                            time_period_list for s in scenario_list if z[i, c, t, s].X > 0}
-        print("Positive z variable values:")
-        for var_name, var_value in positive_z_vars.items():
-            print(f"{var_name}: {var_value:.2f}")
+        # print("Positive z variable values:")
+        # for var_name, var_value in positive_z_vars.items():
+        #     print(f"{var_name}: {var_value:.2f}")
 
         positive_y_vars = {y[i, c, t, s].VarName: y[i, c, t, s].X for i in node_list for c in commodity_list for t in
                            time_period_list for s in scenario_list if y[i, c, t, s].X > 0}
@@ -506,61 +498,14 @@ def solve_subproblem(num_commodities, num_nodes, num_scenarios,num_time_periods,
 
         positive_alpha_vars = {alpha[i, c, s].VarName: alpha[i, c, s].X for i in node_list for c in commodity_list
                                for s in scenario_list if alpha[i, c, s].X > 0}
-        print("Positive alpha variable values:")
-        for var_name, var_value in positive_alpha_vars.items():
-            print(f"{var_name}: {var_value:.2f}")
+        # print("Positive alpha variable values:")
+        # for var_name, var_value in positive_alpha_vars.items():
+        #     print(f"{var_name}: {var_value:.2f}")
 
         return subproblem, subproblem.ObjVal
 
-
-# ```
-
-#### Feasibility Cuts
-# Add constraints to forbid infeasible solutions:
-# ```python
-# def add_feasibility_cut(master, m_i, q, p, r, s):
-#     cone = ...  # Feasible region approximation
-#     master.addConstr(...)  # Add feasibility constraint
-# ```
-
-#### Optimality Cuts
-# Update `theta` with effective bounds:
-# ```python
-# def add_optimality_cut(master, theta, m_i, q, p, r, subproblem_cost, s):
-#     master.addConstr(...)  # Benders optimality cuts
-# ```
-#
-# ---
-
-
-
 if __name__ == "__main__":
-    # Instantiate the model
-    # stochastic_vrp_model = build_stochastic_vrp_model()
-    # deterministic_vrp_model = build_deterministic_vrp_model()
-    #
-    # # Solve with a solver
-    # solver = SolverFactory("gurobi")  # Replace with a solver like CPLEX or Gurobi, if needed
-    # solver.solve(stochastic_vrp_model)
-    # solver.solve(deterministic_vrp_model)
 
-
-
-    # Display only the variable values for both models
-    # print("Stochastic Model Variable Values:")
-    # stochastic_vrp_model.display(ostream=None)
-
-    # print("\nDeterministic Model Variable Values:")
-    # deterministic_vrp_model.display(ostream=None)
-    # solve_deterministic_vrp()
     solve_stochastic_vrp_benders()
 
 
-    #solve stochastic vrp
-
-### Execution
-# - Implement the subproblem constraints (e.g., flow balance).
-# - Run the full iterative decomposition.
-# - Output both the first-stage (master) and second-stage (subproblem) decisions.
-#
-# Let me know if you'd like more details on specific constraints or cuts!

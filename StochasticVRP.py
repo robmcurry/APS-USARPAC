@@ -10,15 +10,20 @@ def solve_stochastic_vrp():
 
 
     num_time_periods = 5
-    num_nodes = 20  # Number of nodes
-    num_vehicles = 20  # Number of vehicles
+    num_nodes = 30  # Number of nodes
+    num_vehicles = 10  # Number of vehicles
     num_commodities = 10  # Number of commodities
     num_scenarios = 2  # Number of scenarios
     time_period_list = range(1, num_time_periods)  # Time periods 1 to 10
 
     time_period_list2 = range(0, num_time_periods)  # Time periods 0 to 10
     vehicle_list = range(1, num_vehicles)  # Vehicles 1 to 10
-    arc_list = random.sample([(i, j) for i in range(1, num_nodes) for j in range(1, num_nodes) if i != j], 60)
+    # arc_list = random.sample([(i, j) for i in range(1, num_nodes) for j in range(1, num_nodes) if i != j], 30)
+
+    arc_list = [(1, 2), (1, 3), (2, 4), (3, 5), (4, 6), (5, 7), (6, 8), (7, 9), (8, 10), (9, 11),
+                (10, 12), (11, 13), (12, 14), (13, 15), (14, 16), (15, 17), (16, 18), (17, 19), (18, 20), (19, 21),
+                (20, 22), (21, 23), (22, 24), (23, 25), (24, 26), (25, 27), (26, 28), (27, 29), (28, 30), (29, 1)]
+
     node_list = list(range(1, num_nodes))  # Nodes 1 to 50
     commodity_list = [f"Commodity{k}" for k in range(1, num_commodities)]  # Commodities 1 to 10
     scenario_list = range(1, num_scenarios+1)  # Scenarios 1 to 15
