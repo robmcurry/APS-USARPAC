@@ -38,30 +38,10 @@ def solve_deterministic_vrp_with_aps(scenario, time_periods=range(1, 6), vehicle
     bar_x = model.addVars(arc_list, time_period_list, vehicle_list, vtype=GRB.BINARY, name="bar_x")
     bar_w = model.addVars(node_list, time_period_list2, vehicle_list, vtype=GRB.BINARY, name="bar_w")
 
-    # Load objective weights from YAML config
-    with open("disaster_logistics_model/config/model_parameters.yaml", "r") as f:
-        param_config = yaml.safe_load(f)
-    weights = param_config.get("objective_weights", {})
-    w_demand = weights.get("unmet_demand", 1.0)
-    w_safety = weights.get("safety_stock", 1.0)
-    w_inventory = weights.get("prepositioning", 1.0)
-
-    # Estimate normalization constants
-    total_demand = sum(scenario["demand"].values())
-    demand_norm = max(1, total_demand)
-    safety_norm = max(1, len(node_list) * len(commodity_list) * len(time_period_list))
-    q_norm = max(1, len(node_list) * len(commodity_list) * 100)  # assumes q[i,c] ≤ 100 typically
-
-    # Define normalized terms
-    normalized_unmet_demand = quicksum(z[i, c, t] for i in node_list for c in commodity_list for t in time_period_list) / demand_norm
-    normalized_safety_penalty = quicksum(alpha[i, c] for i in node_list for c in commodity_list) / safety_norm
-    normalized_q_cost = quicksum(q[i, c] for i in node_list for c in commodity_list) / q_norm
-
-    # Apply weights to normalized terms
     model.setObjective(
-        w_demand * normalized_unmet_demand +
-        w_safety * normalized_safety_penalty +
-        w_inventory * normalized_q_cost,
+        quicksum(z[i, c, t] for i in node_list for c in commodity_list for t in time_period_list) +
+        quicksum(alpha[i, c] for i in node_list for c in commodity_list) +
+        0.001 * quicksum(q[i, c] for i in node_list for c in commodity_list),
         GRB.MINIMIZE
     )
 
