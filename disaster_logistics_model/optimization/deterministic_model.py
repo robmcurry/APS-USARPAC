@@ -8,6 +8,7 @@ def solve_deterministic_vrp_with_aps(scenario, time_periods=range(1, 6), vehicle
         vehicle_list = list(range(1, 6))
 
     time_period_list = list(time_periods)
+
     time_period_list2 = list(range(0, max(time_period_list) + 1))
 
     node_list = sorted(set(int(i) for (i, _) in scenario['demand']))
@@ -17,7 +18,9 @@ def solve_deterministic_vrp_with_aps(scenario, time_periods=range(1, 6), vehicle
     d = {(int(i), c): scenario['demand'][(i, c)] for (i, c) in scenario['demand']}
     cap = {(int(i), int(j), c): scenario['capacity'][(i, j, c)] for (i, j, c) in scenario['capacity']}
 
-    required_safety_stock = 10
+    required_safety_stock = {(i, c): 10 for i in node_list for c in commodity_list}
+
+    L = {c: 2 for c in commodity_list}
 
     model = Model(f"APS_Scenario_{scenario['scenario_id']}")
     model.setParam("OutputFlag", 0)
@@ -58,15 +61,17 @@ def solve_deterministic_vrp_with_aps(scenario, time_periods=range(1, 6), vehicle
         for i in node_list for c in commodity_list for t in time_period_list
     ), name="InventoryConservation")
 
-    model.addConstrs((y[i, c, t] <= w[i, c, t] for i in node_list for c in commodity_list for t in time_period_list), name="DemandFromInventory")
+    # Hmmmm. Not sure what this is doing for sure. The y-variable is what is consumed, but the w is what is stored.
+    # model.addConstrs((y[i, c, t] <= w[i, c, t] for i in node_list for c in commodity_list for t in time_period_list), name="DemandFromInventory")
 
     model.addConstrs((
         x[i, j, c, t, v] <= cap.get((i, j, c), 0)
         for (i, j) in arc_list for c in commodity_list for t in time_period_list for v in vehicle_list
     ), name="ArcCapacity")
 
+    # This is close. We need to update this to not be summed over all time periods. Instead it needs to be the w for the last time period.
     model.addConstrs((
-        alpha[i, c] >= required_safety_stock - quicksum(w[i, c, t] for t in time_period_list)
+        alpha[i, c] >= required_safety_stock - w[i, c, time_period_list[-1]]
         for i in node_list for c in commodity_list
     ), name="SafetyStock")
 
@@ -80,15 +85,39 @@ def solve_deterministic_vrp_with_aps(scenario, time_periods=range(1, 6), vehicle
         quicksum(bar_x[i, j, t, v] for j in node_list if (i, j) in arc_list)
         - quicksum(bar_x[j, i, t, v] for j in node_list if (j, i) in arc_list)
         + bar_w[i, t, v]
-        - (bar_w[i, t - 1, v] if t > 0 else 0)
+        - (bar_w[i, t - 1, v])
         == 0
         for i in node_list for t in time_period_list for v in vehicle_list
     ), name="VehicleFlowBalance")
 
     model.addConstrs((
-        bar_w[i, time_period_list[-1], v] == m_i[i]
-        for i in node_list for v in vehicle_list
+        quicksum(bar_w[i, time_period_list[-1], v] for v in vehicle_list) == m_i[i]
+        for i in node_list
     ), name="VehiclesReturn")
+
+    model.addConstrs((
+        quicksum(bar_w[i, time_period_list[-1], v] for v in vehicle_list) == m_i[i]
+        for i in node_list
+    ), name="VehiclesStart")
+
+    model.addConstrs(
+        (
+            quicksum(x[i, j, c, t, v] for c in commodity_list) <= 100 * bar_x[i, j, t, v]
+            for (i, j) in arc_list
+            for t in time_period_list
+            for v in vehicle_list
+        ),
+        "VehicleOnPositiveFlowArcs",
+    )
+    model.addConstrs(
+        (
+            gp.quicksum(bar_x[i, j, 1, v] for (i, j) in arc_list) <=
+            gp.quicksum(bar_x[i, j, 1, v + 1] for (i, j) in arc_list)
+            for v in range(1, len(vehicle_list))  # v = 1, ..., |V|-1
+
+        ),
+        "VehicleFlowMonotonicity"
+    )
 
     model.optimize()
 

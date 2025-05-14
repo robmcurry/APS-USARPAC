@@ -284,6 +284,7 @@ def solve_stochastic_vrp_benders():
                                   + gp.quicksum(dual_vehicle_return[i,s]*m_i[i] for i in node_list)
                                   + gp.quicksum(dual_vehicle_start_inventory[i,s]*m_i[i] for i in node_list )
                 )
+                # master.addConstr(theta >= optimality_cut[s], name=f"OptimalityCut")
 
             # Ensure master variable theta bounds the subproblem cost
 

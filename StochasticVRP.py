@@ -59,21 +59,14 @@ def solve_stochastic_vrp():
     d = {
         (i, c, t): 30 + ((i + t) % 11) for i in node_list for c in commodity_list for t in time_period_list
     }
-    # Model objective
-    model.setObjective(theta,
-                       GRB.MINIMIZE
-                       )
 
     # Model constraints
     model.addConstr(gp.quicksum(m_i[i] for i in node_list) <= 8, "MaxVehicles")
     model.addConstr(gp.quicksum(p[i] for i in node_list) <= P, "MaxAPSLocationsLimit")
-    model.addConstr(gp.quicksum(p[i] for i in node_list) <= 8, "MaxAPSLocations")
     model.addConstrs((q[i, c] <= 25 * r[i, c] for i in node_list for c in commodity_list), "RestrictedAPS")
     model.addConstrs((gp.quicksum(q[i, c] for c in commodity_list) <= 2000 for i in node_list), "MaxCommodityPerNode")
 
     model.addConstrs((r[i, c] <= p[i] for i in node_list for c in commodity_list), "RestrictedAssignment")
-    model.addConstrs((r[i, c] <= m_i[i] for i in node_list for c in commodity_list),
-                     "CommodityPlacementRequiresVehicle")
 
     model.addConstrs((gp.quicksum(r[i, c] for i in node_list) >= L[c] for c in commodity_list), "MinAPSPerCommodity")
 
@@ -220,9 +213,9 @@ def solve_stochastic_vrp():
         "VehicleFlowMonotonicity"
     )
 
-    print("scenario_list", scenario_list)
-    for s in scenario_list:
-        print ("s", s)
+    # print("scenario_list", scenario_list)
+    # for s in scenario_list:
+    #     print ("s", s)
     model.Params.MipGap = 0.00000000001
     model.optimize()
 
