@@ -9,11 +9,11 @@ def solve_stochastic_vrp():
     # Data initialization
 
 
-    num_time_periods = 5
-    num_nodes = 30  # Number of nodes
-    num_vehicles = 10  # Number of vehicles
-    num_commodities = 10  # Number of commodities
-    num_scenarios = 2  # Number of scenarios
+    num_time_periods = 5 # Number of time periods
+    num_nodes = 50  # Number of nodes
+    num_vehicles = 30  # Number of vehicles
+    num_commodities = 5  # Number of commodities
+    num_scenarios = 10  # Number of scenarios
     time_period_list = range(1, num_time_periods)  # Time periods 1 to 10
 
     time_period_list2 = range(0, num_time_periods)  # Time periods 0 to 10
@@ -59,6 +59,7 @@ def solve_stochastic_vrp():
     d = {
         (i, c, t): 30 + ((i + t) % 11) for i in node_list for c in commodity_list for t in time_period_list
     }
+
 
     # Model constraints
     model.addConstr(gp.quicksum(m_i[i] for i in node_list) <= 8, "MaxVehicles")
