@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html>
+<head>
+    
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+    
+        <script>
+            L_NO_TOUCH = false;
+            L_DISABLE_3D = false;
+        </script>
+    
+    <style>html, body {width: 100%;height: 100%;margin: 0;padding: 0;}</style>
+    <style>#map {position:absolute;top:0;bottom:0;right:0;left:0;}</style>
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="https://netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap-glyphicons.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.2.0/css/all.min.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/python-visualization/folium/folium/templates/leaflet.awesome.rotate.min.css"/>
+    
+            <meta name="viewport" content="width=device-width,
+                initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+            <style>
+                #map_a8c6683c6522835398ea23e1db580b0b {
+                    position: relative;
+                    width: 100.0%;
+                    height: 100.0%;
+                    left: 0.0%;
+                    top: 0.0%;
+                }
+                .leaflet-container { font-size: 1rem; }
+            </style>
+        
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.1.0/leaflet.markercluster.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.1.0/MarkerCluster.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.1.0/MarkerCluster.Default.css"/>
+</head>
+<body>
+    
+    
+            <div class="folium-map" id="map_a8c6683c6522835398ea23e1db580b0b" ></div>
+        
+</body>
+<script>
+    
+    
+            var map_a8c6683c6522835398ea23e1db580b0b = L.map(
+                "map_a8c6683c6522835398ea23e1db580b0b",
+                {
+                    center: [35.186025666666666, 137.38940666666667],
+                    crs: L.CRS.EPSG3857,
+                    ...{
+  "zoom": 3,
+  "zoomControl": true,
+  "preferCanvas": false,
+}
+
+                }
+            );
+
+            
+
+        
+    
+            var tile_layer_3498342040fcd03b87887dcf4d686698 = L.tileLayer(
+                "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+                {
+  "minZoom": 0,
+  "maxZoom": 20,
+  "maxNativeZoom": 20,
+  "noWrap": false,
+  "attribution": "\u0026copy; \u003ca href=\"https://www.openstreetmap.org/copyright\"\u003eOpenStreetMap\u003c/a\u003e contributors \u0026copy; \u003ca href=\"https://carto.com/attributions\"\u003eCARTO\u003c/a\u003e",
+  "subdomains": "abcd",
+  "detectRetina": false,
+  "tms": false,
+  "opacity": 1,
+}
+
+            );
+        
+    
+            tile_layer_3498342040fcd03b87887dcf4d686698.addTo(map_a8c6683c6522835398ea23e1db580b0b);
+        
+    
+            var marker_cluster_b46bd072c27d288a104f6532bf08ef16 = L.markerClusterGroup(
+                {
+}
+            );
+        
+    
+            var circle_marker_0c1fd4523692babf7e17cf1448450dfb = L.circleMarker(
+                [35.1815, 136.9066],
+                {"bubblingMouseEvents": true, "color": "blue", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "blue", "fillOpacity": 0.6, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 10, "stroke": true, "weight": 3}
+            ).addTo(marker_cluster_b46bd072c27d288a104f6532bf08ef16);
+        
+    
+        var popup_e9d449a11216174a935c8f75a2df2c0b = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_61e7207f72cc3ee7b8d69d4b7b9b0f74 = $(`<div id="html_61e7207f72cc3ee7b8d69d4b7b9b0f74" style="width: 100.0%; height: 100.0%;"><b>City:</b> Nagoya<br><b>Scenario ID:</b> 54<br><b>Scenario Type:</b> 0<br><b>Objective Value:</b> 19588136593.65<br><b>Impact Radius (km):</b> 754.1257379388402<br><b>Infrastructure Loss Rate:</b> 0.46<br><b>Population:</b> 9185000</div>`)[0];
+                popup_e9d449a11216174a935c8f75a2df2c0b.setContent(html_61e7207f72cc3ee7b8d69d4b7b9b0f74);
+            
+        
+
+        circle_marker_0c1fd4523692babf7e17cf1448450dfb.bindPopup(popup_e9d449a11216174a935c8f75a2df2c0b)
+        ;
+
+        
+    
+    
+            var circle_marker_3027358a639b623ea2bd6ec8578203bd = L.circleMarker(
+                [35.682839, 139.759455],
+                {"bubblingMouseEvents": true, "color": "blue", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "blue", "fillOpacity": 0.6, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 10, "stroke": true, "weight": 3}
+            ).addTo(marker_cluster_b46bd072c27d288a104f6532bf08ef16);
+        
+    
+        var popup_b745ed546df74c2934e80a0a32636abc = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_1d262ae699db39765797377c43580af0 = $(`<div id="html_1d262ae699db39765797377c43580af0" style="width: 100.0%; height: 100.0%;"><b>City:</b> Tokyo<br><b>Scenario ID:</b> 64<br><b>Scenario Type:</b> 1<br><b>Objective Value:</b> 20485282714.66<br><b>Impact Radius (km):</b> 616.5729203072852<br><b>Infrastructure Loss Rate:</b> 0.18<br><b>Population:</b> 37400068</div>`)[0];
+                popup_b745ed546df74c2934e80a0a32636abc.setContent(html_1d262ae699db39765797377c43580af0);
+            
+        
+
+        circle_marker_3027358a639b623ea2bd6ec8578203bd.bindPopup(popup_b745ed546df74c2934e80a0a32636abc)
+        ;
+
+        
+    
+    
+            var circle_marker_a833dc88f327c7cf2908a9f8ca7d6724 = L.circleMarker(
+                [34.693738, 135.502165],
+                {"bubblingMouseEvents": true, "color": "blue", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "blue", "fillOpacity": 0.6, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 10, "stroke": true, "weight": 3}
+            ).addTo(marker_cluster_b46bd072c27d288a104f6532bf08ef16);
+        
+    
+        var popup_4d69fcb1121f46bdc09c7ac27d2c9418 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_812b9de3df873b6ba6009cc56f310ceb = $(`<div id="html_812b9de3df873b6ba6009cc56f310ceb" style="width: 100.0%; height: 100.0%;"><b>City:</b> Osaka<br><b>Scenario ID:</b> 62<br><b>Scenario Type:</b> 2<br><b>Objective Value:</b> 9243089051.11<br><b>Impact Radius (km):</b> 222.5761904565687<br><b>Infrastructure Loss Rate:</b> 0.61<br><b>Population:</b> 19222665</div>`)[0];
+                popup_4d69fcb1121f46bdc09c7ac27d2c9418.setContent(html_812b9de3df873b6ba6009cc56f310ceb);
+            
+        
+
+        circle_marker_a833dc88f327c7cf2908a9f8ca7d6724.bindPopup(popup_4d69fcb1121f46bdc09c7ac27d2c9418)
+        ;
+
+        
+    
+    
+            marker_cluster_b46bd072c27d288a104f6532bf08ef16.addTo(map_a8c6683c6522835398ea23e1db580b0b);
+        
+</script>
+</html>

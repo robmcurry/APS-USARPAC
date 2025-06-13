@@ -1,19 +1,17 @@
-
-
 network:
   location_file: "disaster_logistics_model/data/pacific_cities.csv"
   shift_longitudes: true
 
 simulation:
   num_scenarios: 100
-  disaster_types: ["typhoon"]
   severity_distribution:
     mean: 2.0
     std_dev: 0.5
-  disaster_radius_km: 1500
   base_demand_food_per_capita: 5
   base_demand_water_per_capita: 15
   supply_fraction: 0.75
+  safety_stock: 10
+  node_capacity: 1000
 
 optimization:
   P_max: 5  # Maximum number of APS sites
@@ -25,6 +23,24 @@ optimization:
   time_periods: 5
   commodities: ["food", "water"]
   vehicle_list: [1, 2, 3, 4, 5]
+
+commodities:
+  size:
+    food: 1.0
+    water: 1.0
+
+vehicles:
+  capacity:
+    1: 1000.0
+    2: 1000.0
+    3: 1000.0
+    4: 1000.0
+    5: 1000.0
+
+aps:
+  min_per_commodity:
+    food: 1
+    water: 1
 
 visualization:
   zoom_start: 3
@@ -47,3 +63,31 @@ objective_weights:
   unmet_demand: 1.0
   safety_stock: 1.0
   prepositioning: 1.0
+
+scenario_profiles:
+  0:
+    impact_radius_km:
+      mean: 500
+      std_dev: 100
+    infrastructure_loss_rate:
+      min: 0.2
+      max: 0.5
+    geographic_tag: "coastal"
+
+  1:
+    impact_radius_km:
+      mean: 800
+      std_dev: 200
+    infrastructure_loss_rate:
+      min: 0.1
+      max: 0.3
+    geographic_tag: "island_chain"
+
+  2:
+    impact_radius_km:
+      mean: 300
+      std_dev: 50
+    infrastructure_loss_rate:
+      min: 0.4
+      max: 0.7
+    geographic_tag: "urban_cluster"
