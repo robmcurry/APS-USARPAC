@@ -17,9 +17,19 @@ def solve_deterministic_vrp_with_aps(scenario, time_periods=range(1, 6), vehicle
     arc_list = sorted(set((int(i), int(j)) for (i, j, c) in scenario['capacity']))
 
     d = {(int(i), c): scenario['demand'][(i, c)] for (i, c) in scenario['demand']}
-    cap = {(int(i), int(j), c): scenario['capacity'][(i, j, c)] for (i, j, c) in scenario['capacity']}
+    # Load infrastructure loss rate from scenario type_attributes (default 0.0)
+    loss_rate = scenario.get("type_attributes", {}).get("infrastructure_loss_rate", 0.0)
+    cap = {(int(i), int(j), c): scenario['capacity'][(i, j, c)] * (1 - loss_rate) for (i, j, c) in scenario['capacity']}
 
     required_safety_stock = 10
+
+    # Parameter loading
+    params = scenario.get("params", {})
+    b = {c: params.get("commodity_size", {}).get(c, 1.0) for c in commodity_list}
+    ell = {(i, c): params.get("safety_stock", {}).get((i, c), required_safety_stock) for i in node_list for c in commodity_list}
+    mu_v = {v: params.get("vehicle_capacity", {}).get(v, 100.0) for v in vehicle_list}
+    L_c = {c: params.get("min_APS_per_commodity", {}).get(c, 1) for c in commodity_list}
+    M_node_capacity = {(i, t): params.get("node_capacity", {}).get((i, t), 100.0) for i in node_list for t in time_period_list}
 
     model = Model(f"APS_Scenario_{scenario['scenario_id']}")
     model.setParam("OutputFlag", 0)
@@ -33,25 +43,48 @@ def solve_deterministic_vrp_with_aps(scenario, time_periods=range(1, 6), vehicle
     q = model.addVars(node_list, commodity_list, vtype=GRB.INTEGER, name="q", lb=0)
     r = model.addVars(node_list, commodity_list, vtype=GRB.BINARY, name="r")
     p = model.addVars(node_list, vtype=GRB.BINARY, name="p")
-
     m_i = model.addVars(node_list, name="m_i", lb=0)
     bar_x = model.addVars(arc_list, time_period_list, vehicle_list, vtype=GRB.BINARY, name="bar_x")
     bar_w = model.addVars(node_list, time_period_list2, vehicle_list, vtype=GRB.BINARY, name="bar_w")
 
+    # New objective coefficients (placeholders, update as needed)
+    delta = {(i, c, t): 1.0 for i in node_list for c in commodity_list for t in time_period_list}  # Placeholder, update if needed
+    nu = {(i, c): 1.0 for i in node_list for c in commodity_list}  # Placeholder, update if needed
+
     model.setObjective(
-        quicksum(z[i, c, t] for i in node_list for c in commodity_list for t in time_period_list) +
-        quicksum(alpha[i, c] for i in node_list for c in commodity_list) +
-        0.001 * quicksum(q[i, c] for i in node_list for c in commodity_list),
+        quicksum(delta[i, c, t] * z[i, c, t] for i in node_list for c in commodity_list for t in time_period_list) +
+        quicksum(nu[i, c] * alpha[i, c] for i in node_list for c in commodity_list),
         GRB.MINIMIZE
     )
 
+    # 1. MaxVehicles
+    model.addConstr(quicksum(m_i[i] for i in node_list) <= 10, name="MaxVehicles")
+
+    # 2. q_r_link
+    model.addConstrs((q[i, c] <= M * r[i, c] for i in node_list for c in commodity_list), name="q_r_link")
+
+    # 3. r_p_link
+    model.addConstrs((r[i, c] <= p[i] for i in node_list for c in commodity_list), name="r_p_link")
+
+    # 4. Max_APS_Locations
+    model.addConstr(quicksum(p[i] for i in node_list) <= P_max, name="Max_APS_Locations")
+
+    # 5. Min_APS_Per_Commodity
+    model.addConstrs((
+        quicksum(r[i, c] for i in node_list) >= L_c[c]
+        for c in commodity_list
+    ), name="Min_APS_Per_Commodity")
+
+    # 6. InitialInventory
     model.addConstrs((w[i, c, 0] == q[i, c] for i in node_list for c in commodity_list), name="InitialInventory")
 
+    # 7. DemandSplit
     model.addConstrs((
         quicksum(y[i, c, tau] for tau in time_period_list if tau <= t) + z[i, c, t] == d.get((i, c), 0)
         for i in node_list for c in commodity_list for t in time_period_list
     ), name="DemandSplit")
 
+    # 8. InventoryConservation
     model.addConstrs((
         w[i, c, t] == w[i, c, t - 1]
         + quicksum(x[j, i, c, t, v] for j in node_list if (j, i) in arc_list for v in vehicle_list)
@@ -60,24 +93,22 @@ def solve_deterministic_vrp_with_aps(scenario, time_periods=range(1, 6), vehicle
         for i in node_list for c in commodity_list for t in time_period_list
     ), name="InventoryConservation")
 
-    model.addConstrs((y[i, c, t] <= w[i, c, t] for i in node_list for c in commodity_list for t in time_period_list), name="DemandFromInventory")
+    # 9. DemandFromInventory
+    #model.addConstrs((y[i, c, t] <= w[i, c, t] for i in node_list for c in commodity_list for t in time_period_list), name="DemandFromInventory")
 
+    # 10. ArcCapacity
     model.addConstrs((
         x[i, j, c, t, v] <= cap.get((i, j, c), 0)
         for (i, j) in arc_list for c in commodity_list for t in time_period_list for v in vehicle_list
     ), name="ArcCapacity")
 
+    # 11. MatchFlowToVehicle
     model.addConstrs((
-        alpha[i, c] >= required_safety_stock - quicksum(w[i, c, t] for t in time_period_list)
-        for i in node_list for c in commodity_list
-    ), name="SafetyStock")
+        quicksum(b[c] * x[i, j, c, t, v] for c in commodity_list) <= mu_v[v] * bar_x[i, j, t, v]
+        for (i, j) in arc_list for t in time_period_list for v in vehicle_list
+    ), name="MatchFlowToVehicle")
 
-    model.addConstrs((q[i, c] <= M * r[i, c] for i in node_list for c in commodity_list), name="q_r_link")
-    model.addConstrs((r[i, c] <= p[i] for i in node_list for c in commodity_list), name="r_p_link")
-    model.addConstr(quicksum(p[i] for i in node_list) <= P_max, name="Max_APS_Locations")
-
-    model.addConstr(quicksum(m_i[i] for i in node_list) <= 10, name="MaxVehicles")
-
+    # 12. VehicleFlowBalance
     model.addConstrs((
         quicksum(bar_x[i, j, t, v] for j in node_list if (i, j) in arc_list)
         - quicksum(bar_x[j, i, t, v] for j in node_list if (j, i) in arc_list)
@@ -87,10 +118,36 @@ def solve_deterministic_vrp_with_aps(scenario, time_periods=range(1, 6), vehicle
         for i in node_list for t in time_period_list for v in vehicle_list
     ), name="VehicleFlowBalance")
 
+    # 13. VehiclesReturn
     model.addConstrs((
-        bar_w[i, time_period_list[-1], v] == m_i[i]
-        for i in node_list for v in vehicle_list
+        quicksum(bar_w[i, 0, v] for v in vehicle_list) == m_i[i]
+        for i in node_list
+    ), name="VehiclesStart")
+
+    # 13b. VehiclesReturn
+    model.addConstrs((
+        quicksum(bar_w[i, time_period_list[-1], v] for v in vehicle_list) == m_i[i]
+        for i in node_list
     ), name="VehiclesReturn")
+
+    # 14. SafetyStock
+    model.addConstrs((
+        alpha[i, c] >= ell[i, c] - (
+            q[i, c] - quicksum(
+                x[i, j, c, t, v] - x[j, i, c, t, v]
+                for t in time_period_list
+                for v in vehicle_list
+                for j in node_list if (i, j) in arc_list and (j, i) in arc_list
+            )
+        )- M * (1 - p[i])
+        for i in node_list for c in commodity_list
+    ), name="SafetyStock")
+
+    # 15. NodeCapacityLimit
+    model.addConstrs((
+        quicksum(b[c] * w[i, c, t] for c in commodity_list) <= M_node_capacity[i, t]
+        for i in node_list for t in time_period_list
+    ), name="NodeCapacityLimit")
 
     model.optimize()
 
@@ -128,6 +185,7 @@ def solve_deterministic_vrp_with_aps(scenario, time_periods=range(1, 6), vehicle
 
     results = {
         "scenario_id": scenario["scenario_id"],
+        "scenario_type": scenario.get("scenario_type", "Unknown"),
         "objective": model.ObjVal if model.Status == GRB.OPTIMAL else None,
         "aps_locations": [i for i in node_list if p[i].x > 0.5],
         "num_q_positive": sum(1 for i in node_list for c in commodity_list if q[i, c].x > 0),
@@ -149,6 +207,10 @@ def solve_deterministic_vrp_with_aps(scenario, time_periods=range(1, 6), vehicle
         "avg_political_score": avg_political_score,
         "composite_score": composite_score,
     }
+    # Carry forward scenario type_attributes for batch summary
+    results["impact_radius_km"] = scenario.get("type_attributes", {}).get("impact_radius_km")
+    results["infrastructure_loss_rate"] = scenario.get("type_attributes", {}).get("infrastructure_loss_rate")
+    results["geographic_tag"] = scenario.get("type_attributes", {}).get("geographic_tag")
 
     return results
 if __name__ == "__main__":
