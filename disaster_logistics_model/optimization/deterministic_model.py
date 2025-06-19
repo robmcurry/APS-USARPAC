@@ -2,8 +2,10 @@
 
 from gurobipy import Model, GRB, quicksum
 from collections import defaultdict
+import networkx as nx
 
-def solve_deterministic_vrp_with_aps(scenario, time_periods=range(1, 6), vehicle_list=None, P_max=5, M=10000):
+
+def solve_deterministic_vrp_with_aps(scenario, time_periods=range(1, 6), vehicle_list=None, P_max=5, M=1000000):
     if vehicle_list is None:
         vehicle_list = list(range(1, 6))
 
@@ -12,10 +14,14 @@ def solve_deterministic_vrp_with_aps(scenario, time_periods=range(1, 6), vehicle
     time_period_list2 = list(range(0, max(time_period_list) + 1))
 
     node_list = sorted(set(int(i) for (i, _) in scenario['demand']))
+    print(node_list)
     commodity_list = sorted(set(c for (_, c) in scenario['demand']))
     arc_list = sorted(set((int(i), int(j)) for (i, j, c) in scenario['capacity']))
 
-    d = {(int(i), c): scenario['demand'][(i, c)] for (i, c) in scenario['demand']}
+    d = {(int(i), c): int(scenario['demand'][(i, c)]) for (i, c) in scenario['demand']}
+
+    destroy = {(int(i), c): 1 if d.get((i, c), 0) > 55500 else 0 for (i, c) in scenario['demand']}
+
     cap = {(int(i), int(j), c): scenario['capacity'][(i, j, c)] for (i, j, c) in scenario['capacity']}
 
     required_safety_stock = {(i, c): 10 for i in node_list for c in commodity_list}
@@ -29,7 +35,7 @@ def solve_deterministic_vrp_with_aps(scenario, time_periods=range(1, 6), vehicle
     y = model.addVars(node_list, commodity_list, time_period_list, name="y", lb=0)
     z = model.addVars(node_list, commodity_list, time_period_list, name="z", lb=0)
     w = model.addVars(node_list, commodity_list, time_period_list2, name="w", lb=0)
-    alpha = model.addVars(node_list, commodity_list, name="alpha", lb=0)
+    alpha = model.addVars(commodity_list, name="alpha", lb=0)
 
     q = model.addVars(node_list, commodity_list, vtype=GRB.INTEGER, name="q", lb=0)
     r = model.addVars(node_list, commodity_list, vtype=GRB.BINARY, name="r")
@@ -40,13 +46,14 @@ def solve_deterministic_vrp_with_aps(scenario, time_periods=range(1, 6), vehicle
     bar_w = model.addVars(node_list, time_period_list2, vehicle_list, vtype=GRB.BINARY, name="bar_w")
 
     model.setObjective(
-        quicksum(z[i, c, t] for i in node_list for c in commodity_list for t in time_period_list) +
-        quicksum(alpha[i, c] for i in node_list for c in commodity_list) +
-        0.001 * quicksum(q[i, c] for i in node_list for c in commodity_list),
+        100*quicksum((1/t)*z[i, c, t] for i in node_list for c in commodity_list for t in time_period_list)+
+            quicksum(alpha[c] for c in commodity_list) ,
         GRB.MINIMIZE
     )
 
-    model.addConstrs((w[i, c, 0] == q[i, c] for i in node_list for c in commodity_list), name="InitialInventory")
+    model.addConstrs((w[i, c, 0] <= q[i, c] for i in node_list for c in commodity_list), name="InitialInventory")
+
+    model.addConstrs((w[i, c, 0] <= 10000*(1-destroy[i, c]) for i in node_list for c in commodity_list), name="InitialInventory")
 
     model.addConstrs((
         quicksum(y[i, c, tau] for tau in time_period_list if tau <= t) + z[i, c, t] == d.get((i, c), 0)
@@ -71,8 +78,8 @@ def solve_deterministic_vrp_with_aps(scenario, time_periods=range(1, 6), vehicle
 
     # This is close. We need to update this to not be summed over all time periods. Instead it needs to be the w for the last time period.
     model.addConstrs((
-        alpha[i, c] >= required_safety_stock - w[i, c, time_period_list[-1]]
-        for i in node_list for c in commodity_list
+        alpha[c] >= 1100 - quicksum(w[i, c, time_period_list[-1]]
+        for i in node_list) for c in commodity_list
     ), name="SafetyStock")
 
     model.addConstrs((q[i, c] <= M * r[i, c] for i in node_list for c in commodity_list), name="q_r_link")
@@ -96,13 +103,18 @@ def solve_deterministic_vrp_with_aps(scenario, time_periods=range(1, 6), vehicle
     ), name="VehiclesReturn")
 
     model.addConstrs((
-        quicksum(bar_w[i, time_period_list[-1], v] for v in vehicle_list) == m_i[i]
+        quicksum(bar_w[i, 0, v] for v in vehicle_list) == m_i[i]
         for i in node_list
     ), name="VehiclesStart")
 
+    model.addConstrs((
+        quicksum(bar_w[i, 0, v] for i in node_list) <= 1
+        for v in vehicle_list
+    ), name="SingleNodePerVehicle")
+
     model.addConstrs(
         (
-            quicksum(x[i, j, c, t, v] for c in commodity_list) <= 100 * bar_x[i, j, t, v]
+            quicksum(x[i, j, c, t, v] for c in commodity_list) <= 1000 * bar_x[i, j, t, v]
             for (i, j) in arc_list
             for t in time_period_list
             for v in vehicle_list
@@ -111,15 +123,146 @@ def solve_deterministic_vrp_with_aps(scenario, time_periods=range(1, 6), vehicle
     )
     model.addConstrs(
         (
-            gp.quicksum(bar_x[i, j, 1, v] for (i, j) in arc_list) <=
-            gp.quicksum(bar_x[i, j, 1, v + 1] for (i, j) in arc_list)
+            quicksum(bar_x[i, j, 1, v] for (i, j) in arc_list) <=
+            quicksum(bar_x[i, j, 1, v + 1] for (i, j) in arc_list)
             for v in range(1, len(vehicle_list))  # v = 1, ..., |V|-1
-
         ),
         "VehicleFlowMonotonicity"
     )
 
-    model.optimize()
+    # Add subtour elimination constraints
+
+    counter = 1
+    while True:
+
+        print("Solve ", counter)
+        model.optimize()
+
+        # Check for flow cycles in each time period
+        def find_flow_cycles(x_vals, time_period):
+            # Create separate flow graphs for each vehicle 
+            for v in vehicle_list:
+                flow_graph = nx.DiGraph()
+                for (i, j, c, t, vh) in x_vals:
+                    if t == time_period and vh == v and x_vals[(i, j, c, t, vh)].x > 0:
+                        if not flow_graph.has_edge(i, j):
+                            flow_graph.add_edge(i, j)
+                try:
+                    cycle = nx.find_cycle(flow_graph)
+                    return cycle
+                except nx.NetworkXNoCycle:
+                    continue
+            return None
+
+        # Check all time periods for cycles
+        found_cycles = False
+        for t in time_period_list:
+            cycles = find_flow_cycles(x, t)
+            if cycles:
+                found_cycles = True
+                print(f"Flow cycle found in period {t}:")
+                cycle_str = []
+                for i, j in cycles:
+                    flow_sum = sum(
+                        x[i, j, c, t, v].x for c in commodity_list for v in vehicle_list if x[i, j, c, t, v].x > 0)
+                    cycle_str.append(f"{i} --({flow_sum:.2f})--> {j}")
+                print(" ".join(cycle_str))
+
+                # Add subtour elimination constraint
+                model.addConstr(
+                    quicksum(bar_x[i, j, t, v] for (i, j) in cycles for v in vehicle_list)
+                    <= len(cycles) - 1
+                )
+
+        # Break if no cycles found
+        if not found_cycles:
+            print("no more cycles")
+            break
+        else:
+            counter = counter + 1
+
+    # Print variable values
+    print("\nVariable Values:")
+    print("\nFlow variables (x):")
+    for (i, j, c, t, v) in x.keys():
+        val = x[i, j, c, t, v].x
+        if val > 0:
+            print(f"x[{i},{j},{c},{t},{v}] = {val}")
+
+
+
+    print("\nDemand fulfillment variables (y):")
+    for i in node_list:
+        for c in commodity_list:
+            for t in time_period_list:
+                val = y[i, c, t].x
+                if val > 0:
+                    print(f"y[{i},{c},{t}] = {val}")
+
+    print("\nUnmet demand variables (z):")
+    for i in node_list:
+        for c in commodity_list:
+            for t in time_period_list:
+                val = z[i, c, t].x
+                if val > 0:
+                    print(f"z[{i},{c},{t}] = {val}")
+
+    print("\nInventory variables (w):")
+    for i in node_list:
+        for c in commodity_list:
+            for t in time_period_list2:
+                val = w[i, c, t].x
+                if val > 0:
+                    print(f"w[{i},{c},{t}] = {val}")
+
+    print("\nSafety stock shortage variables (alpha):")
+
+    for c in commodity_list:
+        val = alpha[c].x
+        if val > 0:
+            print(f"alpha[{c}] = {val}")
+
+    print("\nInitial inventory variables (q):")
+    for i in node_list:
+        for c in commodity_list:
+            val = q[i, c].x
+            if val > 0:
+                print(f"q[{i},{c}] = {val}")
+
+    print("\nAPS location indicators (p):")
+    for i in node_list:
+        val = p[i].x
+        if val > 0:
+            print(f"p[{i}] = {val}")
+
+    print("\nInventory location indicators (r):")
+    for i in node_list:
+        for c in commodity_list:
+            val = r[i, c].x
+            if val > 0:
+                print(f"r[{i},{c}] = {val}")
+
+    print("\nVehicle assignments (m_i):")
+    for i in node_list:
+        val = m_i[i].x
+        if val > 0:
+            print(f"m_i[{i}] = {val}")
+
+    print("\nVehicle flow indicators (bar_x):")
+    # for (i, j) in arc_list:
+    #     for t in time_period_list:
+    #         for v in vehicle_list:
+    #             val = bar_x[i, j, t, v].x
+    #             if val > 0:
+    #                 print(f"bar_x[{i},{j},{t},{v}] = {val}")
+
+    print("\nVehicle location indicators (bar_w):")
+    for i in node_list:
+        for t in time_period_list2:
+            for v in vehicle_list:
+                val = bar_w[i, t, v].x
+                if val > 0:
+                    print(f"bar_w[{i},{t},{v}] = {val}")
 
     flow_summary = defaultdict(float)
     for (i, j, c, t, v) in x.keys():
@@ -155,3 +298,5 @@ if __name__ == "__main__":
     result = solve_deterministic_vrp_with_aps(dummy_scenario)
     print("APS Objective:", result["objective"])
     print("Selected APS Locations:", result["aps_locations"])
+
+    

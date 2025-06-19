@@ -32,6 +32,7 @@ disaster_logistics_model/
    from disaster_logistics_model.network.network_builder import build_geospatial_network
    G, locations = build_geospatial_network("disaster_logistics_model/data/pacific_cities.csv")
    ```
+   
 
 2. **Generate scenarios**:
    ```python
