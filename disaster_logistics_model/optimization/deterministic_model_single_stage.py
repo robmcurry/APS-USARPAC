@@ -50,7 +50,7 @@ def solve_deterministic_vrp_with_aps_single_stage(scenario, vehicle_list=None, P
     weight['shortfall'] = 0
 
     # maximum number of vehicles
-    max_num_vehicles = 30
+    max_num_vehicles = 300
 
     # Initialize optimization model
     model = Model(f"APS_Scenario_{scenario['scenario_id']}")
