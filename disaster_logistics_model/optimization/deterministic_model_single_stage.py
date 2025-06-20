@@ -140,6 +140,11 @@ def solve_deterministic_vrp_with_aps_single_stage(scenario, vehicle_list=None, P
 
 
     model.addConstrs((
+        # The constraint ensures that a node j is a leaf node in facility k's tree if it has no outgoing flow
+        # Left side: leaf_node_var[j,k] indicates if node j is a leaf node for facility k  
+        # Right side: 
+        # - 2 minus sum of incoming flows to node j from facility k 
+        # - Large term to force the constraint to hold only when j is assigned to facility k
         leaf_node_var[j, k] >= 2 - quicksum(tree_flow[i, j, k] for i in node_list if (i, j) in arc_list)
         - len(node_list)*(1 - f[j, k])
         for j in node_list
