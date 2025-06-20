@@ -46,8 +46,8 @@ def solve_deterministic_vrp_with_aps_single_stage(scenario, vehicle_list=None, P
 
     # objective weights
     weight = {}
-    weight['deficit'] = 0.9
-    weight['shortfall'] = 0.1
+    weight['deficit'] = 100
+    weight['shortfall'] = 0
 
     # maximum number of vehicles
     max_num_vehicles = 30
