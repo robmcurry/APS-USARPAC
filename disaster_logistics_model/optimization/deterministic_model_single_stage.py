@@ -40,12 +40,11 @@ def solve_deterministic_vrp_with_aps_single_stage(scenario, vehicle_list=None, P
     d = {(int(i), c): int(scenario['demand'][(i, c)]) for (i, c) in scenario['demand']}
     cap = {(int(i), int(j), c): int(scenario['capacity'][(i, j, c)]) for (i, j, c) in scenario['capacity']}
 
-    redundancy = {int(i): 2 for i in node_list }
+    # commented redundancy dictionary initialization
+    redundancy = {int(i): 2 for i in node_list}  # Defines redundancy requirements for each node
 
     # Degradation levels at node i for commodity c. We do want this to be scenario based at some point.
     g = {(int(i), c): 1 for i in node_list for c in commodity_list}
-
-    
 
     # Set safety stock requirements
     required_safety_stock = {c: 1000 for c in commodity_list}
@@ -55,6 +54,7 @@ def solve_deterministic_vrp_with_aps_single_stage(scenario, vehicle_list=None, P
 
     # The minimum proportion of remaining stock within each region
     region_proportions = {1: 0.6, 2: 0.1, 3: 0.1}
+
     # objective weights
     weight = {}
     weight['deficit'] = .3
