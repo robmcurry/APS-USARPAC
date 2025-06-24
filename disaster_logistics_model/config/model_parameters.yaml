@@ -1,5 +1,5 @@
 seed: 42
-num_scenarios: 2
+num_scenarios: 3
 
 default_disaster:
   severity_range: [1.0, 5.0]
@@ -12,5 +12,5 @@ commodities:
   - water
 
 arc_capacity:
-  base: 100
+  base: 1000
   multiplier: 100
