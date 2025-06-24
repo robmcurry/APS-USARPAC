@@ -8,13 +8,28 @@ from typing import Dict, Set, List
 
     # def print_model_parameters(scenario, vehicle_list, P_max, M, required_safety_stock, L, weight, max_num_vehicles):
     #
-def solve_deterministic_vrp_with_aps_single_stage(scenario, vehicle_list=None, P_max=7, M=9900):
+def solve_deterministic_vrp_with_aps_single_stage(scenario, vehicle_list=None, P_max=7, M=9900,
+                                                  ):
     # Start timing execution
     start_time = time.time()
 
     # Extract node list from scenario demand
     node_list = sorted(set(int(i) for (i, _) in scenario['demand']))
 
+    # Initialize region mapping dictionary
+    region_mapping = {node: 0 for node in node_list}
+    # Add nodes 1 through 10 to region 1
+    # Nodes 11 through 20 in region 2
+    # nodes 21 through 41 in region 3
+    for node in node_list:
+        if node < 11:
+            region_mapping[node] = 1
+        elif node < 21:
+            region_mapping[node] = 2
+        else:
+            region_mapping[node] = 3
+
+    print(region_mapping)
     # Extract commodity list and arc list from scenario
     commodity_list = sorted(set(c for (_, c) in scenario['demand']))
     arc_list = sorted(set((int(i), int(j)) for (i, j, c) in scenario['capacity']))
@@ -30,12 +45,16 @@ def solve_deterministic_vrp_with_aps_single_stage(scenario, vehicle_list=None, P
     # Degradation levels at node i for commodity c. We do want this to be scenario based at some point.
     g = {(int(i), c): 1 for i in node_list for c in commodity_list}
 
+    
+
     # Set safety stock requirements
     required_safety_stock = {c: 1000 for c in commodity_list}
 
     # Redundancy parameter
     L = {c: 2 for c in commodity_list}
 
+    # The minimum proportion of remaining stock within each region
+    region_proportions = {1: 0.6, 2: 0.1, 3: 0.1}
     # objective weights
     weight = {}
     weight['deficit'] = .3
@@ -269,12 +288,13 @@ def solve_deterministic_vrp_with_aps_single_stage(scenario, vehicle_list=None, P
         for c in commodity_list
     ),name='safetystockbalance')
 
-    # Can only have remaining stocks at the original APS locations
-    # model.addConstrs((
-    #     y[i,c] <= M*(1-p[i])
-    #     for i in node_list
-    #     for c in commodity_list
-    # ),name='remainingstock')
+    # Regional distribution constraints for y-variables
+    model.addConstrs((
+        quicksum(y[i, c] for i in node_list if region_mapping[i] == r) >=
+        region_proportions[r] * quicksum(y[i, c] for i in node_list)
+        for r in region_proportions.keys()
+        for c in commodity_list
+    ), name='regional_distribution')
 
     counter = 1
 
