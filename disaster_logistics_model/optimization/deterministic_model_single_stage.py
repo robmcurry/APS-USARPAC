@@ -287,12 +287,12 @@ def solve_deterministic_vrp_with_aps_single_stage(scenario, vehicle_list=None, P
     # Print variable values
     print("\nVariable Values:")
     print("\nTree flow variables:")
-    for k in node_list:
-        if p[k].x > 0:  # Only show for APS nodes
-            print(f"\nTree flows for APS at node {k}:")
-            for (i, j) in arc_list:
-                if tree_flow[i, j, k].x > 0:
-                    print(f"tree_flow[{i},{j},{k}] = {tree_flow[i, j, k].x:.2f}")
+    # for k in node_list:
+    #     if p[k].x > 0:  # Only show for APS nodes
+    #         print(f"\nTree flows for APS at node {k}:")
+    #         for (i, j) in arc_list:
+    #             if tree_flow[i, j, k].x > 0:
+    #                 print(f"tree_flow[{i},{j},{k}] = {tree_flow[i, j, k].x:.2f}")
     #
     # print("\nLeaf node variables:")
     # for j in node_list:
@@ -301,7 +301,7 @@ def solve_deterministic_vrp_with_aps_single_stage(scenario, vehicle_list=None, P
     #             print(f"leaf_node_var[{j},{k}] = {leaf_node_var[j, k].x:.2f}")
     #
     # # Print positive flow variables
-    print("\nPositive flow variables (x):")
+    # print("\nPositive flow variables (x):")
     for k in node_list:
         for (i, j) in arc_list:
             for c in commodity_list:
@@ -315,12 +315,12 @@ def solve_deterministic_vrp_with_aps_single_stage(scenario, vehicle_list=None, P
     #         continue
     #
     # value = 0
-    print("\nUnmet demand variables (z):")
-    for i in node_list:
-        for c in commodity_list:
-            val = z[i, c].x
-            if val > 0:
-                print(f"deficit[{i},{c}] = {val}")
+    # print("\nUnmet demand variables (z):")
+    # for i in node_list:
+    #     for c in commodity_list:
+    #         val = z[i, c].x
+    #         if val > 0:
+    #             print(f"deficit[{i},{c}] = {val}")
     #
     print("\nSafety stock shortage variables (alpha):")
     for c in commodity_list:
@@ -363,10 +363,10 @@ def solve_deterministic_vrp_with_aps_single_stage(scenario, vehicle_list=None, P
                 print(f"bar_x[{i},{j},{k}] = {val:.2f}")
 
     flow_summary = defaultdict(float)
-    for (i, j, c, k) in x.keys():
-        val = x[i, j, c, k].x
-        if val > 0:
-            flow_summary[(i, j)] += val
+    # for (i, j, c, k) in x.keys():
+    #     val = x[i, j, c, k].x
+    #     if val > 0:
+    #         flow_summary[(i, j)] += val
 
     # Calculate computational time  
     computational_time = time.time() - start_time
