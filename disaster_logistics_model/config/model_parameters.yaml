@@ -1,5 +1,5 @@
 seed: 42
-num_scenarios: 3
+num_scenarios: 50
 
 default_disaster:
   severity_range: [1.0, 5.0]

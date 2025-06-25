@@ -72,7 +72,7 @@ def solve_deterministic_vrp_with_aps_single_stage(scenario, vehicle_list=None, P
     # Flow variables for each arc, commodity, and node
     x = model.addVars(arc_list, commodity_list, node_list, vtype=GRB.INTEGER, name="x", lb=0)
     # Variables tracking safety stock shortage for each commodity
-    alpha = model.addVars(commodity_list, name="alpha", lb=0)
+    alpha = model.addVars(commodity_list, vtype=GRB.INTEGER, name="alpha", lb=0)
     # Initial inventory quantities at each node for each commodity
     q = model.addVars(node_list, commodity_list, vtype=GRB.INTEGER, name="q", lb=0)
     # real scenario-based inventory quantities at each node for each commodity
@@ -85,24 +85,21 @@ def solve_deterministic_vrp_with_aps_single_stage(scenario, vehicle_list=None, P
     p = model.addVars(node_list, ub=1, lb=0, name="p")
 
     # Total flow on each arc for each commodity
-    total_flow = model.addVars(arc_list, commodity_list, lb=0, name="totalflow")
+    total_flow = model.addVars(arc_list, commodity_list, vtype=GRB.INTEGER, lb=0, name="totalflow")
     # Flow variables for spanning tree per facility
-    tree_flow = model.addVars(arc_list, node_list, lb=0, name="treeflows")
+    tree_flow = model.addVars(arc_list, node_list, vtype=GRB.INTEGER, lb=0, name="treeflows")
     # Binary variables indicating if arc used in spanning tree
     bar_x = model.addVars(arc_list, node_list, vtype=GRB.BINARY, name="bar_x")
     # Variables tracking excess inventory sent to dummy node
-    y = model.addVars(node_list, commodity_list, name="leftover")
+    y = model.addVars(node_list, commodity_list, vtype=GRB.INTEGER, name="leftover")
     # Variables tracking unmet demand sent to dummy node  
-    z = model.addVars(node_list, commodity_list, name="deficit")
+    z = model.addVars(node_list, commodity_list, vtype=GRB.INTEGER, name="deficit")
     # max tree flow
     max_tree_flow = model.addVars(node_list, name="max_tree_flow")
     # variable signifying a leaf node
     leaf_node_var = model.addVars(node_list, node_list,vtype=GRB.BINARY, name="leaf_node_var")
-
     # Variable for maximum difference in safety stock among all remaining APS locations
-    ss_balance = model.addVar(lb=0,name='safety stock balance')
-
-
+    ss_balance = model.addVar(lb=0, vtype=GRB.INTEGER,name='safety stock balance')
     # Define objective function
     model.setObjective(
         weight['deficit']*quicksum(z[i, c] for i in node_list for c in commodity_list)
@@ -154,13 +151,6 @@ def solve_deterministic_vrp_with_aps_single_stage(scenario, vehicle_list=None, P
         for j in node_list if j != k
     ), name="facility_flow_conservation")
 
-    # Constraint that captures the maximum sized vehicle
-    # model.addConstrs((
-    #     max_tree_flow[k] >= tree_flow[i,j,k]
-    #     for (i,j) in arc_list
-    #     for k in node_list
-    # ), name="max_tree_flow_constraint")
-
     model.addConstrs((
         bar_q[i,c] == g[i,c]*q[i,c]
         for i in node_list
@@ -193,13 +183,6 @@ def solve_deterministic_vrp_with_aps_single_stage(scenario, vehicle_list=None, P
         for (i, j) in arc_list
         for c in commodity_list
         ), name="total_flow_calculation")
-
-    # Upper bound on tree flow based on number of nodes
-    # model.addConstrs((
-    #     tree_flow[i, j, k] <= (len(node_list) - 1) * bar_x[i, j, k]
-    #     for (i, j) in arc_list
-    #     for k in node_list
-    # ), name="tree_flow_upper_bound")
 
     # Prevent bidirectional flow between nodes for each facility
     model.addConstrs((
@@ -430,6 +413,19 @@ def solve_deterministic_vrp_with_aps_single_stage_commodity(scenario, vehicle_li
 
     redundancy = {int(i): 2 for i in node_list}
 
+    # Initialize region mapping dictionary
+    region_mapping = {node: 0 for node in node_list}
+    # Add nodes 1 through 10 to region 1
+    # Nodes 11 through 20 in region 2
+    # nodes 21 through 41 in region 3
+    for node in node_list:
+        if node < 11:
+            region_mapping[node] = 1
+        elif node < 21:
+            region_mapping[node] = 2
+        else:
+            region_mapping[node] = 3
+
     # Degradation levels at node i for commodity c. We do want this to be scenario based at some point.
     g = {(int(i), c): 1 for i in node_list for c in commodity_list}
 
@@ -439,10 +435,14 @@ def solve_deterministic_vrp_with_aps_single_stage_commodity(scenario, vehicle_li
     # Redundancy parameter
     L = {c: 2 for c in commodity_list}
 
+    # The minimum proportion of remaining stock within each region
+    region_proportions = {1: 0.6, 2: 0.1, 3: 0.1}
+
     # objective weights
     weight = {}
     weight['deficit'] = 1000000
     weight['shortfall'] = 1
+    weight['balance'] = .4
 
     # maximum number of vehicles
     max_num_vehicles = 300
@@ -661,6 +661,22 @@ def solve_deterministic_vrp_with_aps_single_stage_commodity(scenario, vehicle_li
         for c in commodity_list
     ), name="SafetyStock")
 
+    # Captures the maximum difference between remaining stocks at nodes i and k
+    model.addConstrs((
+        ss_balance >= y[i, c] - y[k, c]
+        for i in node_list
+        for k in node_list
+        for c in commodity_list
+    ), name='safetystockbalance')
+
+    # Define variable for tracking safety stock shortage for each commodity 
+    # alpha[c] represents the shortage amount below required safety stock level for commodity c
+    # Lower bound of 0 means shortages can't be negative
+    alpha = model.addVars(commodity_list, name="alpha", lb=0)
+
+    # Define variable for storing initial inventory quantities for each node-commodity pair
+    # q[i,c] represents the inventory of commodity c stored at node i
+    # Must be integer values with lower bound of 0 (can't have negative inventory)
     counter = 1
 
     print("Solve ", counter)
