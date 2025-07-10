@@ -3,26 +3,59 @@ network:
   shift_longitudes: true
 
 simulation:
-  num_scenarios: 100
+  num_scenarios: 5
   severity_distribution:
     mean: 2.0
     std_dev: 0.5
   base_demand_food_per_capita: 5
   base_demand_water_per_capita: 15
-  supply_fraction: 0.75
-  safety_stock: 10
-  node_capacity: 1000
+  supply_fraction:
+    value: 200.0  # Each node starts with 2x expected demand
+    surplus_factor: 0.001  # Extra per-capita multiplier for inventory surplus
+  capacity_per_capita:
+    value: 5000
+    surplus_factor: 0.001  # Extra capacity per capita based on population
+  safety_days: 2  # Number of days of supply each node should maintain as safety stock
+
+  scenario_profiles:
+    coastal:
+      impact_radius_mean_km: 500
+      impact_radius_std_km: 100
+      infrastructure_loss_min: 0.3
+      infrastructure_loss_max: 0.4
+    island_chain:
+      impact_radius_mean_km: 800
+      impact_radius_std_km: 200
+      infrastructure_loss_min: 0.3
+      infrastructure_loss_max: 0.4
+    urban_cluster:
+      impact_radius_mean_km: 300
+      impact_radius_std_km: 50
+      infrastructure_loss_min: 0.3
+      infrastructure_loss_max: 0.4
 
 optimization:
-  P_max: 5  # Maximum number of APS sites
-  required_safety_stock: 10
-  M: 10000  # Big-M value for linking constraints
-  vehicle_capacity_food: 1000
-  vehicle_capacity_water: 1000
-  max_vehicles: 10
-  time_periods: 5
+  P_max: 10  # Increase from 5
+  required_safety_stock:
+    food: 1000
+    water: 1000
+  M: 9900  # Adjusted Big-M value
+  redundancy:
+    food: 1
+    water: 1
   commodities: ["food", "water"]
-  vehicle_list: [1, 2, 3, 4, 5]
+  max_num_vehicles: 1000  # Lowered from 10000
+
+
+  region_proportions:
+    1: 0.6
+    2: 0.1
+    3: 0.1
+
+  objective_weights:
+    deficit: 0.3
+    shortfall: 0.3
+    balance: 0.4  # Rename from prepositioning to match instructor logic
 
 commodities:
   size:
@@ -56,38 +89,3 @@ visualization:
 output:
   batch_summary_file: "disaster_logistics_model/output/batch_summary.csv"
   scenario_maps_folder: "disaster_logistics_model/output/scenario_maps"
-
-
-# Objective weights for optimization
-objective_weights:
-  unmet_demand: 1.0
-  safety_stock: 1.0
-  prepositioning: 1.0
-
-scenario_profiles:
-  0:
-    impact_radius_km:
-      mean: 500
-      std_dev: 100
-    infrastructure_loss_rate:
-      min: 0.2
-      max: 0.5
-    geographic_tag: "coastal"
-
-  1:
-    impact_radius_km:
-      mean: 800
-      std_dev: 200
-    infrastructure_loss_rate:
-      min: 0.1
-      max: 0.3
-    geographic_tag: "island_chain"
-
-  2:
-    impact_radius_km:
-      mean: 300
-      std_dev: 50
-    infrastructure_loss_rate:
-      min: 0.4
-      max: 0.7
-    geographic_tag: "urban_cluster"

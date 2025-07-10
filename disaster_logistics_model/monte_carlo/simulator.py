@@ -1,7 +1,8 @@
 import random
 import math
 import networkx as nx
-from disaster_logistics_model.config.loader import load_parameters
+import json
+import os
 
 
 def generate_scenarios(G, locations, num_scenarios=None):
@@ -17,29 +18,94 @@ def generate_scenarios(G, locations, num_scenarios=None):
         list: A list of scenario dictionaries containing details such as epicenter, affected nodes, demand, supply, and parameters.
     """
     # Load parameters for simulation, commodities, vehicles, and APS
-    params = load_parameters()
+    params = {
+        "optimization": {
+            "redundancy": {"food": 2, "water": 2},
+            "region_proportions": {1: 0.6, 2: 0.1, 3: 0.1},
+            "objective_weights": {"deficit": 0.3, "shortfall": 0.3, "balance": 0.4},
+            "max_num_vehicles": 300
+        },
+        "simulation": {
+            "num_scenarios": 5,
+            "base_demand_food_per_capita": 0.3,
+            "base_demand_water_per_capita": 0.5,
+            "supply_fraction": {"value": 1.0},
+            "initial_supply": {"surplus_factor": 1.2},
+            "safety_days": 3,
+            "capacity_per_capita": 1.5,
+            "node_capacity": {"base": 1.0, "surplus_factor": 0.002},
+            "severity_distribution": {"mean": 1.0, "std_dev": 0.5},
+            "scenario_profiles": {
+                "coastal": {
+                    "impact_radius_mean_km": 500,
+                    "impact_radius_std_km": 100,
+                    "infrastructure_loss_min": 0.2,
+                    "infrastructure_loss_max": 0.6
+                },
+                "island_chain": {
+                    "impact_radius_mean_km": 700,
+                    "impact_radius_std_km": 150,
+                    "infrastructure_loss_min": 0.3,
+                    "infrastructure_loss_max": 0.7
+                },
+                "urban_cluster": {
+                    "impact_radius_mean_km": 300,
+                    "impact_radius_std_km": 80,
+                    "infrastructure_loss_min": 0.1,
+                    "infrastructure_loss_max": 0.5
+                }
+            }
+        },
+        "commodities": {
+            "size": {"food": 1.0, "water": 1.0}
+        },
+        "vehicles": {
+            "capacity": 1000
+        },
+        "aps": {
+            "min_per_commodity": 1
+        }
+    }
+    opt_params = params["optimization"]
     sim_params = params["simulation"]
     commodity_size = params["commodities"]["size"]
     vehicle_capacity = params["vehicles"]["capacity"]
     min_APS_per_commodity = params["aps"]["min_per_commodity"]
-    default_safety_stock = params["simulation"]["safety_stock"]
-    default_node_capacity = params["simulation"]["node_capacity"]
+
 
     # Define profiles for different scenario types with their characteristic distributions and tags
     scenario_profiles = {
         0: {
-            "impact_radius_km": lambda: random.gauss(500, 100),
-            "infrastructure_loss_rate": lambda: random.uniform(0.2, 0.5),
+            "impact_radius_km": lambda: random.gauss(
+                sim_params["scenario_profiles"]["coastal"]["impact_radius_mean_km"],
+                sim_params["scenario_profiles"]["coastal"]["impact_radius_std_km"]
+            ),
+            "infrastructure_loss_rate": lambda: random.uniform(
+                sim_params["scenario_profiles"]["coastal"]["infrastructure_loss_min"],
+                sim_params["scenario_profiles"]["coastal"]["infrastructure_loss_max"]
+            ),
             "geographic_tag": lambda: "coastal"
         },
         1: {
-            "impact_radius_km": lambda: random.gauss(800, 200),
-            "infrastructure_loss_rate": lambda: random.uniform(0.1, 0.3),
+            "impact_radius_km": lambda: random.gauss(
+                sim_params["scenario_profiles"]["island_chain"]["impact_radius_mean_km"],
+                sim_params["scenario_profiles"]["island_chain"]["impact_radius_std_km"]
+            ),
+            "infrastructure_loss_rate": lambda: random.uniform(
+                sim_params["scenario_profiles"]["island_chain"]["infrastructure_loss_min"],
+                sim_params["scenario_profiles"]["island_chain"]["infrastructure_loss_max"]
+            ),
             "geographic_tag": lambda: "island_chain"
         },
         2: {
-            "impact_radius_km": lambda: random.gauss(300, 50),
-            "infrastructure_loss_rate": lambda: random.uniform(0.4, 0.7),
+            "impact_radius_km": lambda: random.gauss(
+                sim_params["scenario_profiles"]["urban_cluster"]["impact_radius_mean_km"],
+                sim_params["scenario_profiles"]["urban_cluster"]["impact_radius_std_km"]
+            ),
+            "infrastructure_loss_rate": lambda: random.uniform(
+                sim_params["scenario_profiles"]["urban_cluster"]["infrastructure_loss_min"],
+                sim_params["scenario_profiles"]["urban_cluster"]["infrastructure_loss_max"]
+            ),
             "geographic_tag": lambda: "urban_cluster"
         }
     }
@@ -50,6 +116,7 @@ def generate_scenarios(G, locations, num_scenarios=None):
 
     scenarios = []
     node_list = list(G.nodes())
+    aps_eligible_nodes = node_list
 
     for sid in range(num_scenarios):
         # Select an epicenter node and scenario type randomly
@@ -83,15 +150,25 @@ def generate_scenarios(G, locations, num_scenarios=None):
         # Calculate demand and supply for affected nodes
         demand = {}
         supply = {}
-        for node in affected_nodes:
-            pop = G.nodes[node]["population"]
-            food_demand = pop * sim_params["base_demand_food_per_capita"] * severity
-            water_demand = pop * sim_params["base_demand_water_per_capita"] * severity
-            demand[(node, "food")] = food_demand
-            demand[(node, "water")] = water_demand
 
-            food_supply = pop * sim_params["base_demand_food_per_capita"] * sim_params["supply_fraction"]
-            water_supply = pop * sim_params["base_demand_water_per_capita"] * sim_params["supply_fraction"]
+        supply_fraction = sim_params["supply_fraction"]["value"]
+        surplus_factor = sim_params.get("initial_supply", {}).get("surplus_factor", 1.0)
+
+        for node in G.nodes():
+            pop = G.nodes[node]["population"]
+
+            # Only generate demand for affected nodes
+            if node in affected_nodes:
+                food_demand = pop * sim_params["base_demand_food_per_capita"] * severity
+                water_demand = pop * sim_params["base_demand_water_per_capita"] * severity
+                demand[(node, "food")] = food_demand
+                demand[(node, "water")] = water_demand
+
+            # Always generate supply
+            food_supply = pop * sim_params["base_demand_food_per_capita"] * supply_fraction
+            water_supply = pop * sim_params["base_demand_water_per_capita"] * supply_fraction
+            food_supply *= surplus_factor
+            water_supply *= surplus_factor
             supply[(node, "food")] = food_supply
             supply[(node, "water")] = water_supply
 
@@ -102,14 +179,36 @@ def generate_scenarios(G, locations, num_scenarios=None):
             capacity[(i, j, "water")] = 1e6
 
         # Define safety stock and node capacity for affected nodes
-        safety_stock = {(node, c): default_safety_stock for node in affected_nodes for c in ["food", "water"]}
-        node_capacity = {(node, t): default_node_capacity for node in affected_nodes for t in range(1, 6)}
+        safety_days = sim_params["safety_days"]
+        capacity_per_capita = sim_params["capacity_per_capita"]
+        base_demand_food = sim_params["base_demand_food_per_capita"]
+        base_demand_water = sim_params["base_demand_water_per_capita"]
+
+        safety_stock = {}
+        node_capacity = {}
+
+        for node in G.nodes():
+            pop = G.nodes[node]["population"]
+            capacity_base = sim_params.get("node_capacity", {}).get("base", 1.0)
+            capacity_surplus = sim_params.get("node_capacity", {}).get("surplus_factor", 0.0)
+            scaled_capacity = capacity_base * (1 + capacity_surplus * pop)
+
+            for c in ["food", "water"]:
+                if node not in affected_nodes:
+                    base_demand = base_demand_food if c == "food" else base_demand_water
+                    safety_stock[(node, c)] = safety_days * base_demand * pop
+                else:
+                    safety_stock[(node, c)] = 0.0
+
+            for t in range(1, 6):  # Time periods 1 to 5
+                node_capacity[(node, t)] = scaled_capacity
 
         # Assemble the scenario dictionary
         scenario = {
             "scenario_id": sid,
             "epicenter": epicenter,
             "epicenter_neighbors": num_neighbors,
+            "region_mapping": {node: locations[node].get("region", None) for node in node_list},
             "severity": severity,
             "affected_nodes": affected_nodes,
             "demand": demand,
@@ -126,11 +225,33 @@ def generate_scenarios(G, locations, num_scenarios=None):
                 "vehicle_capacity": vehicle_capacity,
                 "safety_stock": safety_stock,
                 "min_APS_per_commodity": min_APS_per_commodity,
-                "node_capacity": node_capacity
+                "aps_eligible_nodes": aps_eligible_nodes,
+                "node_capacity": node_capacity,
+                "redundancy": opt_params["redundancy"],
+                "region_proportions": opt_params["region_proportions"],
+                "objective_weights": opt_params["objective_weights"],
+                "max_num_vehicles": opt_params["max_num_vehicles"]
             }
         }
         scenarios.append(scenario)
 
+    def convert_to_nested_list_format(d):
+        return [[list(k), v] for k, v in d.items()]
+
+    export_scenarios = []
+    for s in scenarios:
+        export_scenario = s.copy()
+        export_scenario["demand"] = convert_to_nested_list_format(s["demand"])
+        export_scenario["supply"] = convert_to_nested_list_format(s["supply"])
+        export_scenario["capacity"] = convert_to_nested_list_format(s["capacity"])
+        export_scenario["params"]["safety_stock"] = convert_to_nested_list_format(s["params"]["safety_stock"])
+        export_scenario["params"]["node_capacity"] = convert_to_nested_list_format(s["params"]["node_capacity"])
+        export_scenarios.append(export_scenario)
+
+    output_path = os.path.join(os.path.dirname(__file__), "simulation_output.json")
+    with open(output_path, "w") as f:
+        json.dump(export_scenarios, f, indent=2)
+    print(f"Simulation results saved to {output_path}")
     return scenarios
 
 
@@ -145,3 +266,11 @@ def haversine(coord1, coord2):
 
     a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
     return 2 * R * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+
+if __name__ == "__main__":
+    from disaster_logistics_model.network.network_builder import build_geospatial_network
+
+    csv_path = "disaster_logistics_model/data/pacific_cities.csv"
+    G, locations = build_geospatial_network(csv_path)
+    generate_scenarios(G, locations)
