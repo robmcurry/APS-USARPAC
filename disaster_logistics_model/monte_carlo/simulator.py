@@ -19,12 +19,6 @@ def generate_scenarios(G, locations, num_scenarios=None):
     """
     # Load parameters for simulation, commodities, vehicles, and APS
     params = {
-        "optimization": {
-            "redundancy": {"food": 2, "water": 2},
-            "region_proportions": {1: 0.6, 2: 0.1, 3: 0.1},
-            "objective_weights": {"deficit": 0.3, "shortfall": 0.3, "balance": 0.4},
-            "max_num_vehicles": 300
-        },
         "simulation": {
             "num_scenarios": 5,
             "base_demand_food_per_capita": 0.3,
@@ -66,7 +60,6 @@ def generate_scenarios(G, locations, num_scenarios=None):
             "min_per_commodity": 1
         }
     }
-    opt_params = params["optimization"]
     sim_params = params["simulation"]
     commodity_size = params["commodities"]["size"]
     vehicle_capacity = params["vehicles"]["capacity"]
@@ -124,8 +117,22 @@ def generate_scenarios(G, locations, num_scenarios=None):
         scenario_type = random.choice(list(scenario_profiles.keys()))
         profile = scenario_profiles[scenario_type]
 
-        # Sample scenario-specific attributes
-        impact_radius_km = profile["impact_radius_km"]()
+        # Severity is bounded between 0.1 and 3.0 to prevent unrealistic scaling
+        severity = min(
+            max(0.1, random.gauss(
+                sim_params["severity_distribution"]["mean"],
+                sim_params["severity_distribution"]["std_dev"]
+            )),
+            3.0  # Upper bound for severity
+        )
+
+        # Adjust impact radius based on severity: higher severity = larger impact area
+        # Formula: adjusted_radius = base_radius * (1 + alpha * (severity - 1))
+        base_radius = profile["impact_radius_km"]()
+        # Scale impact radius based on severity, with adjustable alpha
+        alpha = 0.3  # Tuning parameter for severity influence
+        impact_radius_km = base_radius * (1 + alpha * (severity - 1))
+
         loss_rate = profile["infrastructure_loss_rate"]()
         geo_tag = profile["geographic_tag"]()
 
@@ -134,12 +141,6 @@ def generate_scenarios(G, locations, num_scenarios=None):
             1 for neighbor in G.neighbors(epicenter)
             if haversine(locations[epicenter]["coords"], locations[neighbor]["coords"]) <= impact_radius_km
         )
-
-        # Sample severity of the scenario
-        severity = max(0.1, random.gauss(
-            sim_params["severity_distribution"]["mean"],
-            sim_params["severity_distribution"]["std_dev"]
-        ))
 
         # Identify affected nodes within the impact radius
         affected_nodes = [
@@ -226,11 +227,7 @@ def generate_scenarios(G, locations, num_scenarios=None):
                 "safety_stock": safety_stock,
                 "min_APS_per_commodity": min_APS_per_commodity,
                 "aps_eligible_nodes": aps_eligible_nodes,
-                "node_capacity": node_capacity,
-                "redundancy": opt_params["redundancy"],
-                "region_proportions": opt_params["region_proportions"],
-                "objective_weights": opt_params["objective_weights"],
-                "max_num_vehicles": opt_params["max_num_vehicles"]
+                "node_capacity": node_capacity
             }
         }
         scenarios.append(scenario)
