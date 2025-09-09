@@ -14,7 +14,7 @@ def generate_scenarios(G: nx.Graph, locations: Dict[int, Dict], num_scenarios: i
     if seed is None:
         seed = params.get("seed", None)
     if num_scenarios is None:
-        num_scenarios = params.get("num_scenarios", 5)
+        num_scenarios = params.get("num_scenarios", 50)
 
     if seed is not None:
         random.seed(seed)
@@ -46,6 +46,14 @@ def generate_scenarios(G: nx.Graph, locations: Dict[int, Dict], num_scenarios: i
                 capacity[(i, j, c)] = base_cap
                 capacity[(j, i, c)] = base_cap
 
+        aps_capacity = {}
+
+        for i in node_ids:
+            pop = 500 + int(1000)
+
+            for c in params["commodities"]:
+                aps_capacity[(i, c)] = int(pop*.8)
+
         scenarios.append({
             "scenario_id": s_id,
             "epicenter": epicenter,
@@ -53,7 +61,8 @@ def generate_scenarios(G: nx.Graph, locations: Dict[int, Dict], num_scenarios: i
             "affected_nodes": affected_nodes,
             "demand": demand,
             "supply": supply,
-            "capacity": capacity
+            "capacity": capacity,
+            "aps_capacity": aps_capacity
         })
 
     return scenarios

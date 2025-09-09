@@ -38,6 +38,9 @@ def solve_deterministic_vrp_with_aps_single_stage(scenario, vehicle_list=None, P
     # Initialize demand and capacity dictionaries
     d = {(int(i), c): 0 for i in node_list for c in commodity_list}
     d = {(int(i), c): int(scenario['demand'][(i, c)]) for (i, c) in scenario['demand']}
+
+    aps_capacity = {(int(i), c): 0 for i in node_list for c in commodity_list}
+    aps_capacity = {(int(i), c): int(scenario['aps_capacity'][(i, c)]) for (i, c) in scenario['aps_capacity']}
     cap = {(int(i), int(j), c): int(scenario['capacity'][(i, j, c)]) for (i, j, c) in scenario['capacity']}
 
     # commented redundancy dictionary initialization
@@ -118,7 +121,7 @@ def solve_deterministic_vrp_with_aps_single_stage(scenario, vehicle_list=None, P
     # Variable linking constraints
     # Constraint linking quantity stored (q) to binary variable (r) indicating if commodity c stored at node i
     model.addConstrs((
-        q[i, c] <= M * r[i, c]
+        q[i, c] <= aps_capacity[i, c] * r[i, c]
         for i in node_list
         for c in commodity_list
     ), name="q_r_link")
@@ -288,8 +291,8 @@ def solve_deterministic_vrp_with_aps_single_stage(scenario, vehicle_list=None, P
     model.optimize()
 
     # Print variable values
-    print("\nVariable Values:")
-    print("\nTree flow variables:")
+    # print("\nVariable Values:")
+    # print("\nTree flow variables:")
     # for k in node_list:
     #     if p[k].x > 0:  # Only show for APS nodes
     #         print(f"\nTree flows for APS at node {k}:")
@@ -305,11 +308,11 @@ def solve_deterministic_vrp_with_aps_single_stage(scenario, vehicle_list=None, P
     #
     # # Print positive flow variables
     # print("\nPositive flow variables (x):")
-    for k in node_list:
-        for (i, j) in arc_list:
-            for c in commodity_list:
-                if x[i, j, c, k].x > 0.001:
-                    print(f"x[{i},{j},{c},{k}] = {x[i, j, c, k].x:.2f}")
+    # for k in node_list:
+    #     for (i, j) in arc_list:
+    #         for c in commodity_list:
+    #             if x[i, j, c, k].x > 0.001:
+    #                 print(f"x[{i},{j},{c},{k}] = {x[i, j, c, k].x:.2f}")
     #
     # parent = {}
     # # Build flow network for each APS
@@ -325,11 +328,11 @@ def solve_deterministic_vrp_with_aps_single_stage(scenario, vehicle_list=None, P
     #         if val > 0:
     #             print(f"deficit[{i},{c}] = {val}")
     #
-    print("\nSafety stock shortage variables (alpha):")
-    for c in commodity_list:
-        val = alpha[c].x
-        if val > 0:
-            print(f"alpha[{c}] = {val}")
+    # print("\nSafety stock shortage variables (alpha):")
+    # for c in commodity_list:
+    #     val = alpha[c].x
+    #     if val > 0:
+    #         print(f"alpha[{c}] = {val}")
     #
     # print("\nInitial inventory variables (q):")
     # for i in node_list:
@@ -358,12 +361,12 @@ def solve_deterministic_vrp_with_aps_single_stage(scenario, vehicle_list=None, P
     #         if val > 0:
     #             print(f"r[{i},{c}] = {val}")
 
-    print("\nVehicle flow indicators (bar_x):")
-    for k in node_list:
-        for (i, j) in arc_list:
-            val = bar_x[i, j, k].x
-            if val > 0:
-                print(f"bar_x[{i},{j},{k}] = {val:.2f}")
+    # print("\nVehicle flow indicators (bar_x):")
+    # for k in node_list:
+    #     for (i, j) in arc_list:
+    #         val = bar_x[i, j, k].x
+    #         if val > 0:
+    #             print(f"bar_x[{i},{j},{k}] = {val:.2f}")
 
     flow_summary = defaultdict(float)
     # for (i, j, c, k) in x.keys():
@@ -384,7 +387,7 @@ def solve_deterministic_vrp_with_aps_single_stage(scenario, vehicle_list=None, P
         "total_flow": sum(flow_summary.values()),
         "status": model.Status,
         "existing_inventory": {(i, c): q[i, c].x for i in node_list for c in commodity_list if q[i, c].x > 0},
-        "initial_inventory": {(i, c): q[i, c]},
+        "initial_inventory": {(i, c): q[i, c].x for i in node_list for c in commodity_list if q[i, c].x > 0},
         "w_full": {(i, c): q[i, c].x for i in node_list for c in commodity_list if q[i, c].x > 0},
         "flow_summary": dict(flow_summary),
         "computational_time": computational_time

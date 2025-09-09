@@ -150,69 +150,69 @@ def generate_severity_vs_objective_chart(batch_summary_path, output_dir):
     print(f"Severity vs. objective chart saved to {output_path}")
 
 
-# 3D chart: severity vs objective vs epicenter_neighbors
-def generate_3d_severity_objective_connectivity_chart(batch_summary_path, output_dir):
-    import pandas as pd
-    import matplotlib.pyplot as plt
-    import os
-    from mpl_toolkits.mplot3d import Axes3D
-
-    df = pd.read_csv(batch_summary_path)
-
-    fig = plt.figure(figsize=(10, 7))
-    ax = fig.add_subplot(111, projection='3d')
-    ax.scatter(df['severity'], df['objective'], df['epicenter_neighbors'],
-               c=df['epicenter_neighbors'], cmap='viridis', alpha=0.8)
-
-    ax.set_xlabel('Severity')
-    ax.set_ylabel('Objective Value')
-    ax.set_zlabel('Epicenter Connectivity (# neighbors)')
-    plt.title('Severity vs Objective vs Epicenter Connectivity')
-
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, '3d_severity_objective_connectivity.png')
-    plt.savefig(output_path)
-    plt.close()
-    print(f"3D plot saved to {output_path}")
-
-
-# Interactive 3D chart using Plotly
-def generate_interactive_3d_severity_objective_connectivity_chart(batch_summary_path, output_dir):
-    import pandas as pd
-    import plotly.graph_objects as go
-    import os
-
-    df = pd.read_csv(batch_summary_path)
-
-    fig = go.Figure(data=[go.Scatter3d(
-        x=df['severity'],
-        y=df['objective'],
-        z=df['epicenter_neighbors'],
-        mode='markers',
-        marker=dict(
-            size=6,
-            color=df['objective'],  # Use objective value for color
-            colorscale='RdBu',
-            colorbar=dict(title='Objective'),
-            opacity=0.8
-        ),
-        text=[f"Scenario {sid}" for sid in df['scenario_id']]
-    )])
-
-    fig.update_layout(
-        scene=dict(
-            xaxis_title='Severity',
-            yaxis_title='Objective Value',
-            zaxis_title='Epicenter Connectivity (# neighbors)'
-        ),
-        title='Interactive 3D: Severity vs Objective vs Connectivity',
-        margin=dict(l=0, r=0, b=0, t=30)
-    )
-
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, 'interactive_3d_severity_objective_connectivity.html')
-    fig.write_html(output_path)
-    print(f"Interactive 3D plot saved to {output_path}")
+# # 3D chart: severity vs objective vs epicenter_neighbors
+# def generate_3d_severity_objective_connectivity_chart(batch_summary_path, output_dir):
+#     import pandas as pd
+#     import matplotlib.pyplot as plt
+#     import os
+#     from mpl_toolkits.mplot3d import Axes3D
+#
+#     df = pd.read_csv(batch_summary_path)
+#
+#     fig = plt.figure(figsize=(10, 7))
+#     ax = fig.add_subplot(111, projection='3d')
+#     ax.scatter(df['severity'], df['objective'], df['epicenter_neighbors'],
+#                c=df['epicenter_neighbors'], cmap='viridis', alpha=0.8)
+#
+#     ax.set_xlabel('Severity')
+#     ax.set_ylabel('Objective Value')
+#     ax.set_zlabel('Epicenter Connectivity (# neighbors)')
+#     plt.title('Severity vs Objective vs Epicenter Connectivity')
+#
+#     os.makedirs(output_dir, exist_ok=True)
+#     output_path = os.path.join(output_dir, '3d_severity_objective_connectivity.png')
+#     plt.savefig(output_path)
+#     plt.close()
+#     print(f"3D plot saved to {output_path}")
+#
+#
+# # Interactive 3D chart using Plotly
+# def generate_interactive_3d_severity_objective_connectivity_chart(batch_summary_path, output_dir):
+#     import pandas as pd
+#     import plotly.graph_objects as go
+#     import os
+#
+#     df = pd.read_csv(batch_summary_path)
+#
+#     fig = go.Figure(data=[go.Scatter3d(
+#         x=df['severity'],
+#         y=df['objective'],
+#         z=df['epicenter_neighbors'],
+#         mode='markers',
+#         marker=dict(
+#             size=6,
+#             color=df['objective'],  # Use objective value for color
+#             colorscale='RdBu',
+#             colorbar=dict(title='Objective'),
+#             opacity=0.8
+#         ),
+#         text=[f"Scenario {sid}" for sid in df['scenario_id']]
+#     )])
+#
+#     fig.update_layout(
+#         scene=dict(
+#             xaxis_title='Severity',
+#             yaxis_title='Objective Value',
+#             zaxis_title='Epicenter Connectivity (# neighbors)'
+#         ),
+#         title='Interactive 3D: Severity vs Objective vs Connectivity',
+#         margin=dict(l=0, r=0, b=0, t=30)
+#     )
+#
+#     os.makedirs(output_dir, exist_ok=True)
+#     output_path = os.path.join(output_dir, 'interactive_3d_severity_objective_connectivity.html')
+#     fig.write_html(output_path)
+#     print(f"Interactive 3D plot saved to {output_path}")
 def generate_aps_selection_map(batch_summary_path, location_data, output_path):
     import pandas as pd
     import folium
@@ -420,14 +420,14 @@ if __name__ == "__main__":
     generate_aps_frequency_chart(args.summary, args.output)
     generate_objective_chart(args.summary, args.output)
     generate_severity_vs_objective_chart(args.summary, args.output)
-    generate_3d_severity_objective_connectivity_chart(args.summary, args.output)
-    generate_interactive_3d_severity_objective_connectivity_chart(args.summary, args.output)
+    # generate_3d_severity_objective_connectivity_chart(args.summary, args.output)
+    # generate_interactive_3d_severity_objective_connectivity_chart(args.summary, args.output)
     generate_aps_selection_map(args.summary, location_data, os.path.join(args.output, "aps_selection_map.html"))
     generate_epicenter_objective_map(args.summary, location_data, os.path.join(args.output, "epicenter_objective_map.html"))
     generate_composite_score_map(args.summary, location_data, os.path.join(args.output, "composite_score_map.html"))
     generate_disaster_type_impact_charts(args.summary, args.output)
-    # generate_scenario_type_composite_maps(args.summary, location_data, args.output)
-    generate_combined_scenario_type_map(args.summary, location_data, os.path.join(args.output, "combined_scenario_type_map.html"))
+    generate_scenario_type_composite_maps(args.summary, location_data, args.output)
+    # generate_combined_scenario_type_map(args.summary, location_data, os.path.join(args.output, "combined_scenario_type_map.html"))
 
 
 # New function: generate_combined_scenario_type_map
