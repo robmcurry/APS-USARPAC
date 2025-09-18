@@ -1,42 +1,42 @@
-Node ID,Node Name,Country,Latitude,Longitude,Population
-1,Tokyo,Japan,35.682839,139.759455,37400068
-2,Osaka,Japan,34.693738,135.502165,19222665
-3,Sapporo,Japan,43.0618,141.3545,1975814
-4,Fukuoka,Japan,33.5894,130.4017,1611471
-5,Nagoya,Japan,35.1815,136.9066,9185000
-6,Sydney,Australia,-33.8688,151.2093,5312000
-7,Melbourne,Australia,-37.8136,144.9631,5078000
-8,Brisbane,Australia,-27.4698,153.0251,2514000
-9,Perth,Australia,-31.9505,115.8605,2107000
-10,Adelaide,Australia,-34.9285,138.6007,1346000
-11,Wellington,New Zealand,-41.2865,174.7762,215100
-12,Auckland,New Zealand,-36.8485,174.7633,1650000
-13,Nouméa,New Caledonia,-22.2758,166.458,100000
-14,Port Moresby,Papua New Guinea,-9.4438,147.1803,383000
-15,Honiara,Solomon Islands,-9.4456,159.9729,84000
-16,Suva,Fiji,-18.1248,178.4501,93500
-17,Apia,Samoa,-13.8333,-171.7667,39000
-18,Nuku'alofa,Tonga,-21.1394,-175.2044,24000
-19,Majuro,Marshall Islands,7.0897,171.3803,27000
-20,Tarawa,Kiribati,1.4518,172.9717,63000
-21,Palikir,Micronesia,6.917,158.185,4700
-22,Yaren,Nauru,-0.5477,166.9211,1100
-23,Koror,Palau,7.3426,134.4793,11000
-24,Jayapura,Indonesia,-2.5333,140.7167,398000
-25,Davao,Philippines,7.1907,125.4553,1780000
-26,Manila,Philippines,14.5995,120.9842,13923000
-27,Cebu,Philippines,10.3157,123.8854,1059000
-28,Jakarta,Indonesia,-6.2088,106.8456,11355000
-29,Denpasar,Indonesia,-8.6705,115.2126,726000
-30,Bandar Seri Begawan,Brunei,4.9031,114.9398,100700
-31,Kota Kinabalu,Malaysia,5.9804,116.0735,452000
-32,Kuching,Malaysia,1.5533,110.3592,617887
-33,Ho Chi Minh City,Vietnam,10.7769,106.7009,9466000
-34,Hanoi,Vietnam,21.0285,105.8544,8190000
-35,Vientiane,Laos,17.9757,102.6331,948000
-36,Phnom Penh,Cambodia,11.5564,104.9282,2345000
-37,Singapore,Singapore,1.3521,103.8198,5638700
-38,Da Nang,Vietnam,16.0544,108.2022,1153000
-39,Makassar,Indonesia,-5.1477,119.4327,1430000
-40,Medan,Indonesia,3.5952,98.6722,2470000
-41,Honolulu,USA,21.3069,-157.8583,345000
+Node ID,Node Name,Country,Latitude,Longitude,Population,Region
+1,Tokyo,Japan,35.682839,139.759455,37400068,2
+2,Osaka,Japan,34.693738,135.502165,19222665,2
+3,Sapporo,Japan,43.0618,141.3545,1975814,2
+4,Fukuoka,Japan,33.5894,130.4017,1611471,2
+5,Nagoya,Japan,35.1815,136.9066,9185000,2
+6,Sydney,Australia,-33.8688,151.2093,5312000,3
+7,Melbourne,Australia,-37.8136,144.9631,5078000,3
+8,Brisbane,Australia,-27.4698,153.0251,2514000,3
+9,Perth,Australia,-31.9505,115.8605,2107000,2
+10,Adelaide,Australia,-34.9285,138.6007,1346000,2
+11,Wellington,New Zealand,-41.2865,174.7762,215100,3
+12,Auckland,New Zealand,-36.8485,174.7633,1650000,3
+13,Nouméa,New Caledonia,-22.2758,166.458,100000,3
+14,Port Moresby,Papua New Guinea,-9.4438,147.1803,383000,3
+15,Honiara,Solomon Islands,-9.4456,159.9729,84000,3
+16,Suva,Fiji,-18.1248,178.4501,93500,3
+17,Apia,Samoa,-13.8333,-171.7667,39000,1
+18,Nuku'alofa,Tonga,-21.1394,-175.2044,24000,1
+19,Majuro,Marshall Islands,7.0897,171.3803,27000,3
+20,Tarawa,Kiribati,1.4518,172.9717,63000,3
+21,Palikir,Micronesia,6.917,158.185,4700,3
+22,Yaren,Nauru,-0.5477,166.9211,1100,3
+23,Koror,Palau,7.3426,134.4793,11000,2
+24,Jayapura,Indonesia,-2.5333,140.7167,398000,2
+25,Davao,Philippines,7.1907,125.4553,1780000,2
+26,Manila,Philippines,14.5995,120.9842,13923000,2
+27,Cebu,Philippines,10.3157,123.8854,1059000,2
+28,Jakarta,Indonesia,-6.2088,106.8456,11355000,1
+29,Denpasar,Indonesia,-8.6705,115.2126,726000,1
+30,Bandar Seri Begawan,Brunei,4.9031,114.9398,100700,1
+31,Kota Kinabalu,Malaysia,5.9804,116.0735,452000,2
+32,Kuching,Malaysia,1.5533,110.3592,617887,1
+33,Ho Chi Minh City,Vietnam,10.7769,106.7009,9466000,1
+34,Hanoi,Vietnam,21.0285,105.8544,8190000,1
+35,Vientiane,Laos,17.9757,102.6331,948000,1
+36,Phnom Penh,Cambodia,11.5564,104.9282,2345000,1
+37,Singapore,Singapore,1.3521,103.8198,5638700,1
+38,Da Nang,Vietnam,16.0544,108.2022,1153000,1
+39,Makassar,Indonesia,-5.1477,119.4327,1430000,2
+40,Medan,Indonesia,3.5952,98.6722,2470000,1
+41,Honolulu,USA,21.3069,-157.8583,345000,1

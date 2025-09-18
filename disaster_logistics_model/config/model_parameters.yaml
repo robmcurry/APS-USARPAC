@@ -1,16 +1,41 @@
-seed: 42
+seed: 32
 num_scenarios: 15
 
 default_disaster:
   severity_range: [1.0, 5.0]
-  affected_radius:
-    base: 1
-    multiplier: 1
+  affected_radius_km:
+    base: 250
+    multiplier: 250
 
 commodities:
   - food
   - water
 
 arc_capacity:
-  base: 1000
-  multiplier: 100
+  big_M: 1000000
+
+aps_capacity:
+  food: 100000
+  water: 100000
+
+# Average ship distance per day (km). ~20 knots ≈ 37 km/h → ~888 km/day
+ship_km_per_day: 900
+
+# Commodity-specific maximum voyage time (days) for first-wave deliveries
+max_voyage_days:
+  water: 2
+  food: 4
+
+# Per-capita daily needs
+nu_water: 3.0   # liters/person/day
+nu_food: 1.0    # rations/person/day
+
+# Days of supply used to size steady-state node capacity
+node_capacity_days:
+  water: 3
+  food: 7
+
+# Severity degradation factors for node storage capacity
+node_capacity_degradation:
+  water: 0.3
+  food: 0.3

@@ -8,7 +8,7 @@ from typing import Dict, Set, List
 
     # def print_model_parameters(scenario, vehicle_list, P_max, M, required_safety_stock, L, weight, max_num_vehicles):
     #
-def solve_deterministic_vrp_with_aps_single_stage(scenario, vehicle_list=None, P_max=7, M=9900,
+def solve_deterministic_vrp_with_aps_single_stage(scenario, locations, vehicle_list=None, P_max=5, M=9900,
                                                   ):
     # Start timing execution
     start_time = time.time()
@@ -16,24 +16,69 @@ def solve_deterministic_vrp_with_aps_single_stage(scenario, vehicle_list=None, P
     # Extract node list from scenario demand
     node_list = sorted(set(int(i) for (i, _) in scenario['demand']))
 
-    # Initialize region mapping dictionary
-    region_mapping = {node: 0 for node in node_list}
-    # Add nodes 1 through 10 to region 1
-    # Nodes 11 through 20 in region 2
-    # nodes 21 through 41 in region 3
-    for node in node_list:
-        if node < 11:
-            region_mapping[node] = 1
-        elif node < 21:
-            region_mapping[node] = 2
-        else:
-            region_mapping[node] = 3
+    # Updated: Use Region assignments from the locations dictionary (loaded from CSV) instead of hard-coded regions
+    region_mapping = {node: locations[node]["Region"] for node in node_list if "Region" in locations[node]}
 
-    print(region_mapping)
-    # Extract commodity list and arc list from scenario
+    #print(region_mapping)
+    # Extract commodity list from scenario
     commodity_list = sorted(set(c for (_, c) in scenario['demand']))
-    arc_list = sorted(set((int(i), int(j)) for (i, j, c) in scenario['capacity']))
-    arc_list = sorted(set(arc_list))
+
+    # === Voyage-time constrained arc filtering ===
+    # ----------------------------------------------------------------------
+    # UPDATED SECTION: Filter arcs by shipping distance and max voyage days.
+    # - Reads ship_km_per_day and max_voyage_days from scenario['params'] if present.
+    # - Uses haversine function for great-circle distance between node coordinates.
+    # - Only includes arcs (i,j) for commodity c if travel_time_days <= max_voyage_days[c].
+    # - Removes self-loops (i,i).
+    # ----------------------------------------------------------------------
+
+    # Get shipping speed and voyage limits
+    ship_km_per_day = scenario.get("params", {}).get("ship_km_per_day", 900)
+    max_voyage_days = scenario.get("params", {}).get("max_voyage_days", {"water": 2, "food": 4})
+
+    # Helper: haversine great-circle distance, expects (lat, lon) in degrees
+    from math import radians, sin, cos, sqrt, atan2
+    def haversine(coord1, coord2):
+        # Returns distance in kilometers between two (lat, lon) tuples
+        R = 6371.0  # Earth radius in km
+        lat1, lon1 = coord1
+        lat2, lon2 = coord2
+        phi1, phi2 = radians(lat1), radians(lat2)
+        dphi = radians(lat2 - lat1)
+        dlambda = radians(lon2 - lon1)
+        a = sin(dphi/2)**2 + cos(phi1)*cos(phi2)*sin(dlambda/2)**2
+        c = 2 * atan2(sqrt(a), sqrt(1-a))
+        return R * c
+
+    # Build arc_list: only arcs (i,j) for commodity c if travel time <= max_voyage_days[c]
+    # Use external locations dict with 'coords' tuples (lat, lon)
+    coords = {n: locations[n]["coords"] for n in locations}
+    # Build a set of allowed arcs for any commodity
+    allowed_arcs = set()
+    # For diagnostics: track inbound arcs per node
+    inbound_arcs = {i: set() for i in node_list}
+    for (i, j, c) in scenario["capacity"]:
+        i, j = int(i), int(j)
+        if i == j:
+            continue  # Remove self-loops
+        # Only filter if both coords available
+        if i in coords and j in coords:
+            dist_km = haversine(coords[i], coords[j])
+            travel_time_days = dist_km / ship_km_per_day
+            # Use voyage limit for this commodity
+            max_days = max_voyage_days.get(c, max(max_voyage_days.values()))
+            if travel_time_days > max_days:
+                continue  # Exceeds voyage time for this commodity
+        # Else: if coords not available, keep arc (fallback)
+        allowed_arcs.add((i, j))
+        inbound_arcs[j].add(i)
+    arc_list = sorted(allowed_arcs)
+
+    # Diagnostic: Warn if any node has no inbound arcs after filtering
+    isolated_nodes = [i for i, sources in inbound_arcs.items() if not sources]
+    if isolated_nodes:
+        print(f"WARNING: The following nodes are isolated (no inbound arcs after voyage-time filtering): {isolated_nodes}")
+    # ----------------------------------------------------------------------
 
     # Initialize demand and capacity dictionaries
     d = {(int(i), c): 0 for i in node_list for c in commodity_list}
@@ -50,19 +95,19 @@ def solve_deterministic_vrp_with_aps_single_stage(scenario, vehicle_list=None, P
     g = {(int(i), c): 1 for i in node_list for c in commodity_list}
 
     # Set safety stock requirements
-    required_safety_stock = {c: 1000 for c in commodity_list}
+    required_safety_stock = {c: 10000 for c in commodity_list}
 
     # Redundancy parameter
-    L = {c: 2 for c in commodity_list}
+    L = {c: 1 for c in commodity_list}
 
     # The minimum proportion of remaining stock within each region
     region_proportions = {1: 0.6, 2: 0.1, 3: 0.1}
 
     # objective weights
     weight = {}
-    weight['deficit'] = .3
+    weight['deficit'] = .4
     weight['shortfall'] = .3
-    weight['balance'] = .4
+    weight['balance'] = .3
 
     # maximum number of vehicles
     max_num_vehicles = 300
@@ -85,7 +130,7 @@ def solve_deterministic_vrp_with_aps_single_stage(scenario, vehicle_list=None, P
     # Binary variables indicating if commodity stored at node
     r = model.addVars(node_list, commodity_list, vtype=GRB.BINARY, name="r")
     # Binary variables indicating if node is an APS facility
-    p = model.addVars(node_list, ub=1, lb=0, name="p")
+    p = model.addVars(node_list, ub=1, lb=0, vtype=GRB.BINARY, name="p")
 
     # Total flow on each arc for each commodity
     total_flow = model.addVars(arc_list, commodity_list, vtype=GRB.INTEGER, lb=0, name="totalflow")
@@ -95,7 +140,7 @@ def solve_deterministic_vrp_with_aps_single_stage(scenario, vehicle_list=None, P
     bar_x = model.addVars(arc_list, node_list, vtype=GRB.BINARY, name="bar_x")
     # Variables tracking excess inventory sent to dummy node
     y = model.addVars(node_list, commodity_list, vtype=GRB.INTEGER, name="leftover")
-    # Variables tracking unmet demand sent to dummy node  
+    # Variables tracking unmet demand sent to dummy node
     z = model.addVars(node_list, commodity_list, vtype=GRB.INTEGER, name="deficit")
     # max tree flow
     max_tree_flow = model.addVars(node_list, name="max_tree_flow")
@@ -224,7 +269,7 @@ def solve_deterministic_vrp_with_aps_single_stage(scenario, vehicle_list=None, P
 
     # Each node must be assigned to at least one facility
     model.addConstrs((
-        quicksum(f[i, k] for k in node_list) >= redundancy[i]
+        quicksum(f[i, k] for k in node_list) >= redundancy[i]*(1-p[i])
         for i in node_list
     ), name="node_facility_assignment")
 
@@ -250,6 +295,12 @@ def solve_deterministic_vrp_with_aps_single_stage(scenario, vehicle_list=None, P
         for c in commodity_list
     ), name="commodity_flow_link")
 
+    model.addConstrs((
+        x[i, j, c, k] >= bar_x[i, j, k]
+        for (i, j) in arc_list
+        for k in node_list
+        for c in commodity_list
+    ), name="commodity_flow_link2")
     # Flow conservation constraints
     model.addConstrs(
         (bar_q[i, c] + quicksum(total_flow[j, i, c] for j in node_list if (j, i) in arc_list) + z[i, c] ==
@@ -307,12 +358,12 @@ def solve_deterministic_vrp_with_aps_single_stage(scenario, vehicle_list=None, P
     #             print(f"leaf_node_var[{j},{k}] = {leaf_node_var[j, k].x:.2f}")
     #
     # # Print positive flow variables
-    # print("\nPositive flow variables (x):")
-    # for k in node_list:
-    #     for (i, j) in arc_list:
-    #         for c in commodity_list:
-    #             if x[i, j, c, k].x > 0.001:
-    #                 print(f"x[{i},{j},{c},{k}] = {x[i, j, c, k].x:.2f}")
+    print("\nPositive flow variables (x):")
+    for k in node_list:
+        for (i, j) in arc_list:
+            for c in commodity_list:
+                if x[i, j, c, k].x > 0.001:
+                    print(f"x[{i},{j},{c},{k}] = {x[i, j, c, k].x:.2f}")
     #
     # parent = {}
     # # Build flow network for each APS
@@ -348,12 +399,12 @@ def solve_deterministic_vrp_with_aps_single_stage(scenario, vehicle_list=None, P
     #         if val > 0:
     #             print(f"bar_q[{i},{c}] = {val}")
     #
-    # print("\nAPS location indicators (p):")
-    # for i in node_list:
-    #     val = p[i].x
-    #     if val > 0:
-    #         print(f"p[{i}] = {val}")
-    #
+    print("\nAPS location indicators (p):")
+    for i in node_list:
+        val = p[i].x
+        if val > 0:
+            print(f"p[{i}] = {val}")
+
     # print("\nInventory location indicators (r):")
     # for i in node_list:
     #     for c in commodity_list:
@@ -361,12 +412,12 @@ def solve_deterministic_vrp_with_aps_single_stage(scenario, vehicle_list=None, P
     #         if val > 0:
     #             print(f"r[{i},{c}] = {val}")
 
-    # print("\nVehicle flow indicators (bar_x):")
-    # for k in node_list:
-    #     for (i, j) in arc_list:
-    #         val = bar_x[i, j, k].x
-    #         if val > 0:
-    #             print(f"bar_x[{i},{j},{k}] = {val:.2f}")
+    print("\nVehicle flow indicators (bar_x):")
+    for k in node_list:
+        for (i, j) in arc_list:
+            val = bar_x[i, j, k].x
+            if val > 0:
+                print(f"bar_x[{i},{j},{k}] = {val:.2f}")
 
     flow_summary = defaultdict(float)
     # for (i, j, c, k) in x.keys():
@@ -374,12 +425,14 @@ def solve_deterministic_vrp_with_aps_single_stage(scenario, vehicle_list=None, P
     #     if val > 0:
     #         flow_summary[(i, j)] += val
 
-    # Calculate computational time  
+    # Calculate computational time
     computational_time = time.time() - start_time
 
     # Collect and return results
     results = {
         "scenario_id": scenario["scenario_id"],
+        "epicenter": scenario.get("epicenter"),
+        "severity": scenario.get("severity"),
         "objective": model.ObjVal if model.Status == GRB.OPTIMAL else None,
         "aps_locations": [i for i in node_list if p[i].x > 0.5],
         "num_q_positive": sum(1 for i in node_list for c in commodity_list if q[i, c].x > 0),
@@ -397,7 +450,7 @@ def solve_deterministic_vrp_with_aps_single_stage(scenario, vehicle_list=None, P
     return results
 
 
-def solve_deterministic_vrp_with_aps_single_stage_commodity(scenario, vehicle_list=None, P_max=7, M=9900):
+def solve_deterministic_vrp_with_aps_single_stage_commodity(scenario, vehicle_list=None, P_max=1, M=9900):
     # Start timing execution
     start_time = time.time()
 
@@ -407,7 +460,6 @@ def solve_deterministic_vrp_with_aps_single_stage_commodity(scenario, vehicle_li
     # Extract commodity list and arc list from scenario
     commodity_list = sorted(set(c for (_, c) in scenario['demand']))
     arc_list = sorted(set((int(i), int(j)) for (i, j, c) in scenario['capacity']))
-    arc_list = sorted(set(arc_list))
 
     # Initialize demand and capacity dictionaries
     d = {(int(i), c): 0 for i in node_list for c in commodity_list}
@@ -416,36 +468,26 @@ def solve_deterministic_vrp_with_aps_single_stage_commodity(scenario, vehicle_li
 
     redundancy = {int(i): 2 for i in node_list}
 
-    # Initialize region mapping dictionary
-    region_mapping = {node: 0 for node in node_list}
-    # Add nodes 1 through 10 to region 1
-    # Nodes 11 through 20 in region 2
-    # nodes 21 through 41 in region 3
-    for node in node_list:
-        if node < 11:
-            region_mapping[node] = 1
-        elif node < 21:
-            region_mapping[node] = 2
-        else:
-            region_mapping[node] = 3
+    # Use region mapping provided in the scenario
+    region_mapping = scenario.get("region_mapping", {node: 0 for node in node_list})
 
     # Degradation levels at node i for commodity c. We do want this to be scenario based at some point.
     g = {(int(i), c): 1 for i in node_list for c in commodity_list}
 
-    # Set safety stock requirements
-    required_safety_stock = {c: 1000 for c in commodity_list}
+    # Set safety stock requirements, these are likely node specific in the future and require USARPAC input
+    required_safety_stock = {c: 10000 for c in commodity_list}
 
     # Redundancy parameter
-    L = {c: 2 for c in commodity_list}
+    L = {c: 3 for c in commodity_list}
 
     # The minimum proportion of remaining stock within each region
-    region_proportions = {1: 0.6, 2: 0.1, 3: 0.1}
+    region_proportions = {1: 1, 2: 0.3, 3: 0.3}
 
     # objective weights
     weight = {}
-    weight['deficit'] = 1000000
+    weight['deficit'] = 1
     weight['shortfall'] = 1
-    weight['balance'] = .4
+    weight['balance'] = 1
 
     # maximum number of vehicles
     max_num_vehicles = 300
@@ -699,6 +741,8 @@ def solve_deterministic_vrp_with_aps_single_stage_commodity(scenario, vehicle_li
                     if tree_flow[i, j, c, k].x > 0:
                         print(f"tree_flow[{i},{j},{c},{k}] = {tree_flow[i, j, c, k].x:.2f}")
     #
+
+
     # print("\nLeaf node variables:")
     # for j in node_list:
     #     for k in node_list:
@@ -747,12 +791,12 @@ def solve_deterministic_vrp_with_aps_single_stage_commodity(scenario, vehicle_li
     #         if val > 0:
     #             print(f"bar_q[{i},{c}] = {val}")
     #
-    # print("\nAPS location indicators (p):")
-    # for i in node_list:
-    #     val = p[i].x
-    #     if val > 0:
-    #         print(f"p[{i}] = {val}")
-    #
+    print("\nAPS location indicators (p):")
+    for i in node_list:
+        val = p[i].x
+        if val > 0:
+            print(f"p[{i}] = {val}")
+
     # print("\nInventory location indicators (r):")
     # for i in node_list:
     #     for c in commodity_list:
@@ -797,16 +841,5 @@ def solve_deterministic_vrp_with_aps_single_stage_commodity(scenario, vehicle_li
     return results
 
 
-if __name__ == "__main__":
-    # Minimal test with synthetic scenario
-    dummy_scenario = {
-        "scenario_id": 0,
-        "demand": {(1, 'food'): 100, (2, 'water'): 200},
-        "supply": {(1, 'food'): 150, (2, 'water'): 250},
-        "capacity": {(1, 2, 'food'): 300, (2, 1, 'water'): 300}
-    }
 
-    result = solve_deterministic_vrp_with_aps(dummy_scenario)
-    print("APS Objective:", result["objective"])
-    print("Selected APS Locations:", result["aps_locations"])
-    print("Computational Time:", result["computational_time"], "seconds")
+

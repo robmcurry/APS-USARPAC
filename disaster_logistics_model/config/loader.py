@@ -9,4 +9,5 @@ def load_parameters(config_path: str = None):
 
     with open(config_path, "r") as f:
         params = yaml.safe_load(f)
+        print(params)
     return params

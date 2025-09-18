@@ -1,9 +1,9 @@
-from disaster_logistics_model.network.network_builder import build_geospatial_network
-from disaster_logistics_model.monte_carlo.simulator import generate_scenarios
-from disaster_logistics_model.optimization.deterministic_model_single_stage import (
+from network.network_builder import build_geospatial_network
+from monte_carlo.simulator import generate_scenarios
+from optimization.deterministic_model_single_stage import (
     solve_deterministic_vrp_with_aps_single_stage,
 )
-from disaster_logistics_model.visualization.generate_summary_charts import (
+from visualization.generate_summary_charts import (
     generate_aps_frequency_chart,
     generate_objective_chart,
     generate_aps_selection_map
@@ -16,7 +16,7 @@ def main():
     # File paths and constants
     csv_path = "data/pacific_cities.csv"
     output_batch_summary = "output/batch_summary.csv"
-    num_scenarios = 2  # Adjust as needed
+    num_scenarios = 5 # Adjust as needed
 
     # Step 1: Build the network
     print("[1/4] Building the geospatial network...")
@@ -31,7 +31,7 @@ def main():
     # Step 3: Deterministic solution for the first scenario (optional)
     # print("[3/4] Optimizing first scenario (demo run)...")
     # start_time = time.time()
-    # single_result = solve_deterministic_vrp_with_aps_single_stage(scenarios[0])
+    # single_result = solve_deterministic_vrp_with_aps_single_stage(scenarios[0], locations)
     # end_time = time.time()
     # print(f"Single scenario solved in {end_time - start_time:.2f} seconds.")
 
@@ -40,7 +40,7 @@ def main():
     results = []
     for scenario in scenarios:
         print(f"Solving scenario {scenario['scenario_id']}...")
-        res = solve_deterministic_vrp_with_aps_single_stage(scenario)
+        res = solve_deterministic_vrp_with_aps_single_stage(scenario, locations)
         results.append(res)
 
     # Save batch results to CSV
@@ -52,7 +52,7 @@ def main():
 
     # Set paths for input data and output directory
     batch_summary_path = "output/batch_summary.csv"
-    cities_data_path = "data/pacific_cities.csv"
+    cities_data_path = locations
     output_dir = "output"
 
     # Ensure the output directory exists
@@ -69,7 +69,7 @@ def main():
     print("Objective Value Chart saved!")
 
     print("Generating APS Selection Map...")
-    generate_aps_selection_map(batch_summary_path, cities_data_path, output_dir)
+    generate_aps_selection_map(batch_summary_path, cities_data_path, os.path.join(output_dir, "aps_selection_map.html"))
     print("APS Selection Map saved!")
 
     # Step 3: Generate APS Selection Map

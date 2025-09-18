@@ -17,12 +17,17 @@ def build_geospatial_network(csv_file):
     # Step 1: Load and shift longitudes (for Pacific view)
     for _, row in df.iterrows():
         node_id = row["Node ID"]
-        lat, lon = row["Latitude"], row["Longitude"]
+        lat, lon, pop = row["Latitude"], row["Longitude"], row["Population"]
         if lon < 0:
             lon += 360
         coords = (lat, lon)
         name = row["Node Name"]
-        locations[node_id] = {"name": name, "coords": coords}
+        locations[node_id] = {
+            "name": name,
+            "coords": coords,
+            "pop": pop,
+            "Region": row["Region"],  # Added region info from CSV
+        }
         G.add_node(node_id, name=name, coords=coords)
 
     # Step 2: Add weighted edges (distance in km)
