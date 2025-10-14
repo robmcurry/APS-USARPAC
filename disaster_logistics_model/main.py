@@ -16,7 +16,7 @@ def main():
     # File paths and constants
     csv_path = "data/pacific_cities.csv"
     output_batch_summary = "output/batch_summary.csv"
-    num_scenarios = 5 # Adjust as needed
+    num_scenarios = 3 # Adjust as needed
 
     # Step 1: Build the network
     print("[1/4] Building the geospatial network...")

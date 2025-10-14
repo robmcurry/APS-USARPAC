@@ -6,10 +6,12 @@ from typing import List, Dict, Tuple
 from collections import defaultdict
 import math
 from geopy.distance import geodesic
+import json  # For serialization of complex data to JSON strings
+import os
 
 from config.loader import load_parameters
 
-def generate_scenarios(G: nx.Graph, locations: Dict[int, Dict], num_scenarios: int = None, seed: int = None) -> List[Dict]:
+def generate_scenarios(G: nx.Graph, locations: Dict[int, Dict], num_scenarios: int = None, seed: int = None, save_path: str = None) -> List[Dict]:
     """
     Generate a list of disaster scenarios based on a graph of locations and their attributes.
 
@@ -27,6 +29,7 @@ def generate_scenarios(G: nx.Graph, locations: Dict[int, Dict], num_scenarios: i
         - aps_capacity: available pre-positioned stock capacity per node and commodity
         - node_capacity: steady-state node storage capacity (days of supply × population × per-capita need)
         - available_node_capacity: degraded node storage capacity post-disaster
+        - affected_radius_km: radius in kilometers affected by the disaster
     """
     # --- Parameter setup and seeding ---
     # Load parameters from configuration
@@ -59,17 +62,24 @@ def generate_scenarios(G: nx.Graph, locations: Dict[int, Dict], num_scenarios: i
         affected_radius_km = base_radius_km + severity * multiplier_km
 
         # --- Determine affected nodes and node-specific severity based on geographical distance ---
-        epicenter_lat = locations[epicenter].get("lat", locations[epicenter].get("Latitude"))
-        epicenter_lon = locations[epicenter].get("lon", locations[epicenter].get("Longitude"))
+        epicenter_coords = None
+        if "coords" in locations[epicenter]:
+            epicenter_coords = tuple(locations[epicenter]["coords"])
+        else:
+            epicenter_lat = locations[epicenter].get("lat", locations[epicenter].get("Latitude"))
+            epicenter_lon = locations[epicenter].get("lon", locations[epicenter].get("Longitude"))
+            epicenter_coords = (epicenter_lat, epicenter_lon)
         epicenter_pop = locations[epicenter].get("pop", locations[epicenter].get("Population"))
-        epicenter_coords = (epicenter_lat, epicenter_lon)
         affected_nodes = []
         node_severity = {}
         for i in node_ids:
-            node_lat = locations[i].get("lat", locations[i].get("Latitude"))
-            node_lon = locations[i].get("lon", locations[i].get("Longitude"))
+            if "coords" in locations[i]:
+                node_coords = tuple(locations[i]["coords"])
+            else:
+                node_lat = locations[i].get("lat", locations[i].get("Latitude"))
+                node_lon = locations[i].get("lon", locations[i].get("Longitude"))
+                node_coords = (node_lat, node_lon)
             node_pop = locations[i].get("pop", locations[i].get("Population"))
-            node_coords = (node_lat, node_lon)
             dist_km = geodesic(epicenter_coords, node_coords).kilometers
             if dist_km <= affected_radius_km:
                 affected_nodes.append(i)
@@ -146,25 +156,47 @@ def generate_scenarios(G: nx.Graph, locations: Dict[int, Dict], num_scenarios: i
             "aps_capacity": aps_capacity,
             "node_capacity": node_capacity,
             "available_node_capacity": available_node_capacity,
+            "affected_radius_km": affected_radius_km,
         })
 
+    # --- Always export scenarios to output/scenarios.csv ---
+    def normalize_dict_keys(d):
+        normalized = {}
+        for k, v in d.items():
+            if isinstance(k, tuple):
+                if len(k) == 2:
+                    key_str = f"node:{k[0]},commodity:{k[1]}"
+                elif len(k) == 3:
+                    key_str = f"node1:{k[0]},node2:{k[1]},commodity:{k[2]}"
+                else:
+                    key_str = ",".join(str(x) for x in k)
+            else:
+                key_str = str(k)
+            normalized[key_str] = v
+        return normalized
+
+    output_file = os.path.join("output", "scenarios.csv")
+    scenario_rows = []
+    for scenario in scenarios:
+        epicenter_id = scenario["epicenter"]
+        epicenter_name = locations.get(epicenter_id, {}).get("name", locations.get(epicenter_id, {}).get("Name", "Unknown"))
+        row = {
+            "scenario_id": scenario["scenario_id"],
+            "epicenter": epicenter_id,
+            "epicenter_name": epicenter_name,
+            "severity": scenario["severity"],
+            "affected_radius_km": scenario["affected_radius_km"],
+            "affected_nodes": json.dumps(scenario["affected_nodes"]),
+            "demand": json.dumps(normalize_dict_keys(scenario["demand"])),
+            "supply": json.dumps(normalize_dict_keys(scenario["supply"])),
+            "capacity": json.dumps(normalize_dict_keys(scenario["capacity"])),
+            "aps_capacity": json.dumps(normalize_dict_keys(scenario["aps_capacity"])),
+            "node_capacity": json.dumps(normalize_dict_keys(scenario["node_capacity"])),
+            "available_node_capacity": json.dumps(normalize_dict_keys(scenario["available_node_capacity"]))
+        }
+        scenario_rows.append(row)
+    df = pd.DataFrame(scenario_rows)
+    df.to_csv(output_file, index=False)
+    print(f"[Simulator] Scenarios saved to {output_file}")
+
     return scenarios
-
-if __name__ == "__main__":
-    import networkx as nx, pprint
-    G = nx.cycle_graph(5)
-    locations = {i: {"population": 1000 + i*500, "lat": 0.0 + i*0.01, "lon": 0.0 + i*0.01} for i in G.nodes()}
-    scenarios = generate_scenarios(G, locations, num_scenarios=1, seed=42)
-
-    print("\n=== Scenario Summary ===")
-    s = scenarios[0]
-    print("Scenario ID:", s["scenario_id"])
-    print("Epicenter:", s["epicenter"])
-    print("Severity:", s["severity"])
-    print("Affected nodes:", s["affected_nodes"])
-
-    print("\nDemand sample:", list(s["demand"].items())[:5])
-    print("Capacity sample:", list(s["capacity"].items())[:5])
-    print("APS capacity sample:", list(s["aps_capacity"].items())[:5])
-    print("Node capacity sample:", list(s["node_capacity"].items())[:5])
-    print("Available node capacity sample:", list(s["available_node_capacity"].items())[:5])

@@ -12,12 +12,11 @@ commodities:
   - water
 
 arc_capacity:
-  big_M: 1000000
+  big_M: 10000000
 
 aps_capacity:
-  food: 100000
-  water: 100000
-
+  food: 1000000
+  water: 1000000
 # Average ship distance per day (km). ~20 knots ≈ 37 km/h → ~888 km/day
 ship_km_per_day: 900
 
