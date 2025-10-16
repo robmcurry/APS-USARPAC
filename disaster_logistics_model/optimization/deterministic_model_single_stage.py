@@ -8,7 +8,7 @@ from typing import Dict, Set, List
 
     # def print_model_parameters(scenario, vehicle_list, P_max, M, required_safety_stock, L, weight, max_num_vehicles):
     #
-def solve_deterministic_vrp_with_aps_single_stage(scenario, locations, vehicle_list=None, P_max=6, M=9900, epsilon=0.001):
+def solve_deterministic_vrp_with_aps_single_stage(scenario, locations, P_max, redundancy, L):
     # Start timing execution
     start_time = time.time()
 
@@ -58,6 +58,7 @@ def solve_deterministic_vrp_with_aps_single_stage(scenario, locations, vehicle_l
 
     print(f"Affected zone nodes (within {affected_radius_km} km): {[i for i, flag in affected_zone.items() if flag == 1]}")
 
+#How many units of each commidity are needed per capita
     v = {}
     v["food"] = 1
     v["water"] = 3
@@ -141,6 +142,15 @@ def solve_deterministic_vrp_with_aps_single_stage(scenario, locations, vehicle_l
         for c in commodity_list
     ), name="CommodityRedundancy")
 
+    # available_node_capacity is scenario-based and replaces the previous g-based constraint
+    available_node_capacity = {(int(i), c): int(scenario['available_node_capacity'][(i, c)])
+                               for (i, c) in scenario['available_node_capacity']}
+
+    # model.addConstrs((
+    #     bar_q[i, c] <= available_node_capacity[i,c]
+    #     for i in node_list
+    #     for c in commodity_list
+    # ), name="available_node_capacity_constraint")
     # Variable linking constraints
     # Constraint linking quantity stored (q) to binary variable (r) indicating if commodity c stored at node i
     model.addConstrs((
@@ -149,11 +159,11 @@ def solve_deterministic_vrp_with_aps_single_stage(scenario, locations, vehicle_l
         for c in commodity_list
     ), name="q_r_link")
 
-    model.addConstrs((
-        q[i, c] == g[i,c]*bar_q[i, c]
-        for i in node_list
-        for c in commodity_list
-    ), name="q_r_link2")
+    # model.addConstrs((
+    #     q[i, c] == g[i,c]*bar_q[i, c]
+    #     for i in node_list
+    #     for c in commodity_list
+    # ), name="q_r_link2")
 
     # Constraint linking binary variable (r) indicating commodity storage to binary variable (p) indicating APS facility
     model.addConstrs((
@@ -189,15 +199,7 @@ def solve_deterministic_vrp_with_aps_single_stage(scenario, locations, vehicle_l
         for j in node_list if j != k
     ), name="facility_flow_conservation")
 
-    # available_node_capacity is scenario-based and replaces the previous g-based constraint
-    available_node_capacity = {(int(i), c): int(scenario['available_node_capacity'][(i, c)])
-                               for (i, c) in scenario['available_node_capacity']}
 
-    model.addConstrs((
-        bar_q[i, c] <= available_node_capacity[i, c]
-        for i in node_list
-        for c in commodity_list
-    ), name="available_node_capacity_constraint")
 
     model.addConstrs((
         # The constraint ensures that a node j is a leaf node in facility k's tree if it has no outgoing flow
@@ -290,15 +292,15 @@ def solve_deterministic_vrp_with_aps_single_stage(scenario, locations, vehicle_l
     ), name="commodity_flow_link")
 
     # Link commodity flow to arc usage with upper bound (original formulation)
-    model.addConstrs((
-        x[i, j, c, k] <= cap[i, j, c] * bar_x[i, j, k]
-        for (i, j) in arc_list
-        for k in APS_candidates
-        for c in commodity_list
-    ), name="commodity_flow_link2")
+    # model.addConstrs((
+    #     x[i, j, c, k] <= cap[i, j, c] * bar_x[i, j, k]
+    #     for (i, j) in arc_list
+    #     for k in APS_candidates
+    #     for c in commodity_list
+    # ), name="commodity_flow_link2")
     # Flow conservation constraints
     model.addConstrs(
-        (bar_q[i, c] + quicksum(total_flow[j, i, c] for j in node_list if (j, i) in arc_list) + z[i, c] ==
+        (q[i, c] + quicksum(total_flow[j, i, c] for j in node_list if (j, i) in arc_list) + z[i, c] ==
          d.get((i, c), 0) + quicksum(total_flow[i, j, c] for j in node_list if (i, j) in arc_list) + y[i, c]
          for i in node_list
          for c in commodity_list

@@ -10,7 +10,7 @@ def generate_scenario_type_composite_maps(batch_summary_path, location_data, out
     df = pd.read_csv(batch_summary_path)
     scenario_types = df["scenario_type"].unique()
 
-    # Create a base style for lines
+    # Create a NumAPS style for lines
     line_style = {
         'color': '#808080',
         'weight': 1,

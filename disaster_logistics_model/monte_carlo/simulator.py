@@ -56,7 +56,7 @@ def generate_scenarios(G: nx.Graph, locations: Dict[int, Dict], num_scenarios: i
         # Randomly sample severity within configured range
         severity = random.uniform(*params["default_disaster"]["severity_range"])
 
-        # Calculate affected radius based on severity and configured base and multiplier (in kilometers)
+        # Calculate affected radius based on severity and configured NumAPS and multiplier (in kilometers)
         base_radius_km = params["default_disaster"]["affected_radius_km"]["base"]
         multiplier_km = params["default_disaster"]["affected_radius_km"]["multiplier"]
         affected_radius_km = base_radius_km + severity * multiplier_km
@@ -91,7 +91,6 @@ def generate_scenarios(G: nx.Graph, locations: Dict[int, Dict], num_scenarios: i
         demand = {}
         supply = {}
         for i in affected_nodes:
-            # Population defaults to 1000 if not specified
             pop = locations[i].get("pop", locations[i].get("Population"))
             for c in params["commodities"]:
                 # Demand proportional to population and severity at node
