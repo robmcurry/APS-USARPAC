@@ -8,7 +8,7 @@ from typing import Dict, Set, List
 
     # def print_model_parameters(scenario, vehicle_list, P_max, M, required_safety_stock, L, weight, max_num_vehicles):
     #
-def solve_deterministic_vrp_with_aps_single_stage(scenario, locations, P_max, redundancy, L):
+def solve_deterministic_vrp_with_aps_single_stage(scenario, locations, P_max, redundancy, L, distance_days=None):
     # Start timing execution
     start_time = time.time()
 
@@ -28,6 +28,15 @@ def solve_deterministic_vrp_with_aps_single_stage(scenario, locations, P_max, re
     commodity_list = sorted(set(c for (_, c) in scenario['demand']))
     arc_list = sorted(set((int(i), int(j)) for (i, j, c) in scenario['capacity']))
     arc_list = sorted(set(arc_list))
+
+    # Use arc_list provided by the scenario/network builder (no local pruning here)
+
+    # Build binary dictionary t: t[i, k] = 1 if (i, k) is NOT in arc_list (i != k), else 0
+    t = {(i, k): 0 for i in node_list for k in node_list}
+    for i in node_list:
+        for k in node_list:
+            if (i, k) not in arc_list and i != k:
+                t[i, k] = 1
 
     # Initialize demand and capacity dictionaries
     d = {(int(i), c): 0 for i in node_list for c in commodity_list}
@@ -74,19 +83,19 @@ def solve_deterministic_vrp_with_aps_single_stage(scenario, locations, P_max, re
     g = {(int(i), c): 1 for i in node_list for c in commodity_list}
 
     # Set safety stock requirements
-    required_safety_stock = {c: 100000 for c in commodity_list}
+    required_safety_stock = {c: 13500000 for c in commodity_list}
 
     # Redundancy parameter
     L = {c: 3 for c in commodity_list}
 
     # The minimum proportion of remaining stock within each region
-    region_proportions = {1: 0.6, 2: 0.2, 3: 0.2}
+    region_proportions = {1: 0.3, 2: 0.3, 3: 0.4}
 
     # objective weights
     weight = {}
     weight['deficit'] = 1
     weight['shortfall'] = 1
-    weight['balance'] = 1
+   # weight['balance'] = 1
 
     # maximum number of vehicles
     max_num_vehicles = 300
@@ -96,7 +105,7 @@ def solve_deterministic_vrp_with_aps_single_stage(scenario, locations, P_max, re
     model.setParam("OutputFlag", 0)
 
     # Define decision variables
-    # Flow variables for each arc, commodity, and node
+    # Flow variables for each arc, commodity, and node (only for arc_list)
     x = model.addVars(arc_list, commodity_list, node_list, vtype=GRB.INTEGER, name="x", lb=0)
     # Variables tracking safety stock shortage for each commodity
     alpha = model.addVars(commodity_list, vtype=GRB.INTEGER, name="alpha", lb=0)
@@ -111,11 +120,11 @@ def solve_deterministic_vrp_with_aps_single_stage(scenario, locations, P_max, re
     # Binary variables indicating if node is an APS facility
     p = model.addVars(node_list, ub=1, lb=0, vtype=GRB.BINARY, name="p")
 
-    # Total flow on each arc for each commodity
+    # Total flow on each arc for each commodity (only for arc_list)
     total_flow = model.addVars(arc_list, commodity_list, vtype=GRB.INTEGER, lb=0, name="totalflow")
-    # Flow variables for spanning tree per facility
+    # Flow variables for spanning tree per facility (only for arc_list)
     tree_flow = model.addVars(arc_list, node_list, vtype=GRB.INTEGER, lb=0, name="treeflows")
-    # Binary variables indicating if arc used in spanning tree
+    # Binary variables indicating if arc used in spanning tree (only for arc_list)
     bar_x = model.addVars(arc_list, APS_candidates, vtype=GRB.BINARY, name="bar_x")
     # Variables tracking excess inventory sent to dummy node
     y = model.addVars(node_list, commodity_list, vtype=GRB.INTEGER, name="leftover")
@@ -127,10 +136,24 @@ def solve_deterministic_vrp_with_aps_single_stage(scenario, locations, P_max, re
     leaf_node_var = model.addVars(node_list, node_list,vtype=GRB.BINARY, name="leaf_node_var")
     # Variable for maximum difference in safety stock among all remaining APS locations
     ss_balance = model.addVar(lb=0, vtype=GRB.INTEGER,name='safety stock balance')
-    # Define objective function
+    # --- Named expressions for cost components ---
+    # Shortfall cost (safety stock shortage)
+    shortfall_penalty = {c: weight['shortfall'] for c in commodity_list}
+    deficit_penalty = {c: weight['deficit'] for c in commodity_list}
+    total_shortfall_cost = model.addVar(lb=0, name="total_shortfall_cost")
+    total_deficit_cost = model.addVar(lb=0, name="total_deficit_cost")
+    model.addConstr(
+        total_shortfall_cost == quicksum(shortfall_penalty[c] * alpha[c] for c in commodity_list),
+        name="total_shortfall_cost_def"
+    )
+    model.addConstr(
+        total_deficit_cost == quicksum(deficit_penalty[c] * z[i, c] for i in node_list for c in commodity_list),
+        name="total_deficit_cost_def"
+    )
+
+    # Define objective function as sum of named cost expressions (add other components as needed)
     model.setObjective(
-        weight['deficit']*quicksum(z[i, c] for i in node_list for c in commodity_list)
-        + weight['shortfall']*quicksum(alpha[c] for c in commodity_list),
+        total_shortfall_cost + total_deficit_cost,
         GRB.MINIMIZE
     )
 
@@ -186,8 +209,7 @@ def solve_deterministic_vrp_with_aps_single_stage(scenario, locations, P_max, re
     # Constraint to ensure flow only occurs through APS facilities
     model.addConstrs((
         bar_x[i, j, k] <= p[k]
-        for (i, j) in arc_list
-        for k in APS_candidates
+        for (i, j, k) in bar_x
     ), name="APSFlowRestriction")
 
     # Flow conservation constraint for each node and commodity
@@ -268,6 +290,13 @@ def solve_deterministic_vrp_with_aps_single_stage(scenario, locations, P_max, re
         quicksum(f[i, k] for k in APS_candidates) >= redundancy[i]*(1-p[i])
         for i in node_list
     ), name="node_facility_assignment")
+
+    # Prevent assignments to distant APS nodes through multi-hop routing
+    model.addConstrs((
+        f[i, k] <= 1 - t[i, k]
+        for i in node_list
+        for k in node_list if i != k
+    ), name="prohibit_distant_assignment")
 
     # Require incoming arc for each node assigned to a facility
     model.addConstrs((
@@ -419,18 +448,26 @@ def solve_deterministic_vrp_with_aps_single_stage(scenario, locations, P_max, re
                 print(f"bar_x[{i},{j},{k}] = {val:.2f}")
 
     flow_summary = defaultdict(float)
-    # for (i, j, c, k) in x.keys():
-    #     val = x[i, j, c, k].x
-    #     if val > 0:
-    #         flow_summary[(i, j)] += val
+    for (i, j, c, k) in x.keys():
+        val = x[i, j, c, k].x
+        if val > 0:
+            flow_summary[(i, j)] += val
 
-    # Calculate computational time  
+    # Calculate computational time
     computational_time = time.time() - start_time
+
+    # Extract cost component values for batch summary
+    shortfall_val = total_shortfall_cost.X if model.Status == GRB.OPTIMAL else None
+    deficit_val = total_deficit_cost.X if model.Status == GRB.OPTIMAL else None
+    total_val = model.ObjVal if model.Status == GRB.OPTIMAL else None
+
 
     # Collect and return results
     results = {
         "scenario_id": scenario["scenario_id"],
         "objective": model.ObjVal if model.Status == GRB.OPTIMAL else None,
+        "shortfall_cost": shortfall_val,
+        "deficit_cost": deficit_val,
         "aps_locations": [i for i in node_list if p[i].x > 0.5],
         "num_q_positive": sum(1 for i in node_list for c in commodity_list if q[i, c].x > 0),
         "num_initial_inventory": {(i, c): q[i, c].x for i in node_list for c in commodity_list if q[i, c].x > 0},

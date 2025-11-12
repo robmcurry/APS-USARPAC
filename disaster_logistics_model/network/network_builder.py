@@ -3,11 +3,12 @@ import networkx as nx
 from geopy.distance import geodesic
 
 
-def build_geospatial_network(csv_file):
+def build_geospatial_network(csv_file, max_days=3):
     """
     Builds a NetworkX graph from a CSV of nodes with lat/lon and returns both:
     - G: the graph with weighted edges (km distance)
     - locations: a dict of node_id to {name, coords}
+    - max_days: maximum allowed days for an edge to be included (default 3)
     """
 
     df = pd.read_csv(csv_file)
@@ -37,6 +38,13 @@ def build_geospatial_network(csv_file):
             n1, n2 = node_ids[i], node_ids[j]
             c1, c2 = locations[n1]["coords"], locations[n2]["coords"]
             dist = geodesic(c1, c2).kilometers
-            G.add_edge(n1, n2, weight=dist)
+            days = dist / 1500.0
+            if days <= max_days:
+                G.add_edge(n1, n2, weight=dist, days=days)
 
-    return G, locations
+    arc_days = {}
+    for (i, j) in G.edges():
+        arc_days[(i, j)] = G[i][j]['days']
+        arc_days[(j, i)] = G[i][j]['days']  # For undirected access
+
+    return G, locations, arc_days

@@ -45,44 +45,40 @@ def main():
         commodity_list = sorted(set(c for (_, c) in scenario['demand']))
 
     base_redundancy = {int(i): 3 for i in node_list}  # Defines redundancy requirements for each node
-    base_L = {c: 3 for c in commodity_list}
+    # base_L = {c: 3 for c in commodity_list}
     # base_num_APS - 5
+    num_aps=5
+
+    L_values = [1, 2, 3, 4]
 
     # Step 4: Batch process all scenarios
     print("[4/4] Running batch optimization...")
 
-    # for k in [1,2,3,4]:
-    #     base_redundancy = {int(i): k for i in node_list}
-    #     results = []
-    #     for scenario in scenarios:
-    #         print(f"Solving scenario {scenario['scenario_id']}...")
-    #         res = solve_deterministic_vrp_with_aps_single_stage(scenario, locations, num_aps, base_redundancy, base_L)
-    #         results.append(res)
-
-    for num_aps in [3,4,5,6]:
+    for l_val in L_values:
+        base_L = {c: l_val for c in commodity_list}
         results = []
         for scenario in scenarios:
-            print(f"Solving scenario {scenario['scenario_id']}...")
+            print(f"Solving scenario {scenario['scenario_id']} with L = {l_val}...")
             res = solve_deterministic_vrp_with_aps_single_stage(scenario, locations, num_aps, base_redundancy, base_L)
             results.append(res)
 
-        output_dir = f"output/NumAPS/APS_{num_aps}"
+        output_dir = f"output/L/L_{l_val}"
         os.makedirs(output_dir, exist_ok=True)
-        output_batch_summary_NumAPS = os.path.join(output_dir, f"batch_summary_NumAPS_{num_aps}.csv")
+        output_batch_summary_L = os.path.join(output_dir, f"batch_summary_L_{l_val}.csv")
         df = pd.DataFrame(results)
-        df.to_csv(output_batch_summary_NumAPS, index=False)
-        print(f"Batch summary saved at: {output_batch_summary_NumAPS}")
+        df.to_csv(output_batch_summary_L, index=False)
+        print(f"Batch summary saved at: {output_batch_summary_L}")
 
 
     cities_data_path = locations
 
 
-    for num_aps in [3, 4, 5, 6]:
-        batch_summary_path = os.path.join(f"output/NumAPS/APS_{num_aps}", f"batch_summary_NumAPS_{num_aps}.csv")
-        output_dir = f"output/NumAPS/APS_{num_aps}"
+    for l_val in L_values:
+        batch_summary_path = os.path.join(f"output/L/L_{l_val}", f"batch_summary_L_{l_val}.csv")
+        output_dir = f"output/L/L_{l_val}"
         os.makedirs(output_dir, exist_ok=True)
 
-        print(f"Generating visuals for APS = {num_aps}...")
+        print(f"Generating visuals for L = {l_val}...")
 
         generate_aps_frequency_chart(batch_summary_path, output_dir)
         print("APS Frequency Chart saved!")

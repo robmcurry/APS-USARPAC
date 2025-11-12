@@ -43,7 +43,7 @@ def generate_scenarios(G: nx.Graph, locations: Dict[int, Dict], num_scenarios: i
 
     # Determine number of scenarios to generate
     if num_scenarios is None:
-        num_scenarios = params.get("num_scenarios", 50) # default 50 scenarios if none given in params
+        num_scenarios = params.get("num_scenarios", 100) # default 50 scenarios if none given in params
 
     scenarios = []
     print(locations)
