@@ -19,7 +19,7 @@ def main():
 
     # Step 1: Build the network
     print("[1/4] Building the geospatial network...")
-    max_days = 5  # maximum allowed travel days
+    max_days = 4  # maximum allowed travel days
     G, locations, arc_days = build_geospatial_network(csv_path, max_days=max_days)
     print(f"Network and locations loaded. {len(locations)} locations identified.")
 
@@ -63,7 +63,11 @@ def main():
         results = []
         for scenario in scenarios:
             print(f"Solving scenario {scenario['scenario_id']}...")
-            res = solve_deterministic_vrp_with_aps_single_stage(scenario, locations, num_aps, base_redundancy, base_L)
+            try:
+                res = solve_deterministic_vrp_with_aps_single_stage(scenario, locations, num_aps, base_redundancy, base_L)
+            except Exception as e:
+                print(f"Scenario {scenario['scenario_id']} failed: {e}")
+                res = {"scenario_id": scenario["scenario_id"], "status": "infeasible"}
             results.append(res)
 
         output_dir = f"output/NumAPS/APS_{num_aps}"

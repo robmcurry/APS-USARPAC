@@ -19,7 +19,7 @@ def main():
 
     # Step 1: Build the network
     print("[1/4] Building the geospatial network...")
-    max_days = 5  # maximum allowed travel days
+    max_days = 4  # maximum allowed travel days
     G, locations, arc_days = build_geospatial_network(csv_path, max_days=max_days)
     print(f"Network and locations loaded. {len(locations)} locations identified.")
 

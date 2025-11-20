@@ -93,7 +93,7 @@ def solve_deterministic_vrp_with_aps_single_stage(scenario, locations, P_max, re
 
     # objective weights
     weight = {}
-    weight['deficit'] = 1
+    weight['deficit'] = 1000
     weight['shortfall'] = 1
    # weight['balance'] = 1
 
