@@ -1,5 +1,5 @@
 seed: 32
-num_scenarios: 15
+num_scenarios: 100
 
 default_disaster:
   severity_range: [1.0, 5.0]
@@ -18,11 +18,11 @@ aps_capacity:
   food: 1000000
   water: 1000000
 # Average ship distance per day (km). ~20 knots ≈ 37 km/h → ~888 km/day
-ship_km_per_day: 900
+ship_km_per_day: 1500
 
 # Commodity-specific maximum voyage time (days) for first-wave deliveries
 max_voyage_days:
-  water: 2
+  water: 4
   food: 4
 
 # Per-capita daily needs

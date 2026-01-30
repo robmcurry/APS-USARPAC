@@ -161,6 +161,73 @@ def aps_global_frequency(feasible_df: pd.DataFrame) -> pd.DataFrame:
 
 
 # ============================================================
+# 3b. APS SITING – FEASIBLE-ONLY PUBLICATION-READY PDF
+# ============================================================
+
+def aps_frequency_pdf_feasible(feasible_df: pd.DataFrame):
+    """
+    Produce a publication-ready PDF identical in style to the base case,
+    but using ONLY feasible scenarios from the master data.
+    """
+    if "aps_locations" not in feasible_df.columns:
+        print("No aps_locations column; cannot compute APS PDF figure.")
+        return
+
+    freq = {}
+    scenario_count = 0
+
+    for aps_list in feasible_df["aps_locations"]:
+        if isinstance(aps_list, list):
+            scenario_count += 1
+            for node in aps_list:
+                freq[node] = freq.get(node, 0) + 1
+
+    if scenario_count == 0:
+        print("No APS lists found in feasible scenarios; cannot generate PDF.")
+        return
+
+    freq_df = pd.DataFrame.from_dict(freq, orient="index", columns=["count"])
+    freq_df.index.name = "node"
+    freq_df = freq_df.sort_values("count", ascending=False)
+
+    freq_df["node_label"] = freq_df.index.map(
+        lambda x: f"{NODE_TO_NAME.get(int(x), str(x))} ({int(x)})"
+    )
+
+    # --- Publication-ready styling ---
+    plt.rcParams.update({
+        "font.size": 12,
+        "axes.titlesize": 14,
+        "axes.labelsize": 12,
+        "xtick.labelsize": 10,
+        "ytick.labelsize": 10,
+        "figure.dpi": 300,
+        "savefig.dpi": 300,
+        "font.family": "serif"
+    })
+
+    plt.figure(figsize=(10, 8))
+    plt.barh(freq_df["node_label"].head(20), freq_df["count"].head(20), color="0.3")
+    ax = plt.gca()
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    plt.subplots_adjust(left=0.35)
+
+    for i, v in enumerate(freq_df["count"].head(20)):
+        plt.text(v + 0.5, i, str(v), va="center", fontsize=10)
+
+    plt.title("APS Site Selection Frequency (All Feasible Scenarios)")
+    plt.xlabel("Number of Selections")
+    plt.ylabel("Top 20 Candidate Locations (Node ID)")
+
+    pdf_path = os.path.join(FIG_DIR, "aps_frequency_master_feasible.pdf")
+    plt.tight_layout()
+    plt.savefig(pdf_path, format="pdf", bbox_inches="tight")
+    plt.close()
+    print(f"Saved feasible-scenario APS PDF -> {pdf_path}")
+
+
+# ============================================================
 # 4. APS SITING – BY SEVERITY BINS
 # ============================================================
 
@@ -354,6 +421,7 @@ def run_aps_siting_analysis():
 
     # 1. Global APS frequency
     freq_df = aps_global_frequency(feasible)
+    aps_frequency_pdf_feasible(feasible)
 
     # 2. APS by severity bin
     sev_pivot = aps_by_severity_bin(feasible)
