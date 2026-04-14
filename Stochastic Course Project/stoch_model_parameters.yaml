@@ -1,0 +1,37 @@
+seed: 32
+num_scenarios: 100
+
+default_disaster:
+  severity_range: [1.0, 5.0]
+  affected_radius_km:
+    base: 250
+    multiplier: 250
+
+commodities:
+  - food
+  - water
+
+ship_km_per_day: 1500
+
+max_voyage_days:
+  water: 3
+  food: 3
+
+units_per_person_per_day:
+  water: 1.0
+  food: 1.0
+
+inventory_coverage_days:
+  water: 3
+  food: 7
+
+beta: 0.9
+P_max: 3
+
+nominal_arc_capacity:
+  throughput_days: 3
+
+inventory_disruption:
+  cutoff_severity: 4.0
+  safety_stock:
+    fraction: 0.25
