@@ -61,6 +61,9 @@ def solve_stochastic_cvar(
     releasable_fraction = 1.0 - safety_stock_fraction
     # residual_arc_capacity is a shared scenario-dependent arc capacity, not a commodity-specific capacity
     residual_arc_capacity = instance["residual_arc_capacity"]
+    site_cost = instance["site_cost"]
+    selection_budget = instance["selection_budget"]
+    arc_cost = instance["arc_cost"]
     penalty = instance["penalty"]
     P_max = instance["P_max"]
     beta = instance["beta"]
@@ -121,7 +124,7 @@ def solve_stochastic_cvar(
         name="loss",
     )
 
-    # --- Objective: CVaR of unmet-demand penalty ---
+    # --- Objective: CVaR of scenario loss (unmet-demand penalty + transportation cost) ---
     cvar_multiplier = 1.0 / (1.0 - beta)
     model.setObjective(
         eta + cvar_multiplier * gp.quicksum(prob[w] * xi[w] for w in Omega),
@@ -132,6 +135,12 @@ def solve_stochastic_cvar(
 
     # Site budget
     model.addConstr(gp.quicksum(p[i] for i in N) <= P_max, name="SiteBudget")
+
+    # Preposition site selection budget
+    model.addConstr(
+        gp.quicksum(site_cost[i] * p[i] for i in N) <= selection_budget,
+        name="SelectionBudget",
+    )
 
     # Inventory release bounds
     # A node may originate flow only through its usable released inventory.
@@ -190,9 +199,14 @@ def solve_stochastic_cvar(
 
     # Scenario loss definition
     for w in Omega:
+        unmet_penalty_expr = gp.quicksum(
+            penalty[j, r] * z[w, j, r] for j in N for r in R
+        )
+        transportation_cost_expr = gp.quicksum(
+            arc_cost[i, j] * x[w, i, j, r] for (i, j) in A for r in R
+        )
         model.addConstr(
-            loss[w]
-            == gp.quicksum(penalty[j, r] * z[w, j, r] for j in N for r in R),
+            loss[w] == unmet_penalty_expr + transportation_cost_expr,
             name=f"LossDefinition_w{w}",
         )
 
@@ -211,7 +225,10 @@ def solve_stochastic_cvar(
         "eta": None,
         "selected_sites": [],
         "scenario_losses": {},
+        "scenario_transport_cost": {},
+        "scenario_unmet_penalty": {},
         "unmet_demand": {},
+        "flows": {},
         "positive_flows": [],
         "release": {},
         "node_flow_summary": [],
@@ -235,6 +252,16 @@ def solve_stochastic_cvar(
 
         for w in Omega:
             results["scenario_losses"][w] = loss[w].X
+
+        for w in Omega:
+            transport_cost_val = sum(
+                arc_cost[i, j] * x[w, i, j, r].X for (i, j) in A for r in R
+            )
+            unmet_penalty_val = sum(
+                penalty[j, r] * z[w, j, r].X for j in N for r in R
+            )
+            results["scenario_transport_cost"][w] = transport_cost_val
+            results["scenario_unmet_penalty"][w] = unmet_penalty_val
 
         results["release"] = {}
         for w in Omega:
@@ -283,6 +310,7 @@ def solve_stochastic_cvar(
                 for r in R:
                     val = x[w, i, j, r].X
                     if val > 1e-6:
+                        results["flows"][(w, i, j, r)] = val
                         results["positive_flows"].append((w, i, j, r, val))
 
     return results
@@ -307,6 +335,16 @@ def print_solution_summary(results: Dict[str, Any], max_flows: int = 20) -> None
     print("\nScenario losses:")
     for w, val in sorted(results["scenario_losses"].items()):
         print(f"  Scenario {w}: {val:.4f}")
+
+    if results.get("scenario_transport_cost"):
+        print("\nScenario transport costs:")
+        for w, val in sorted(results["scenario_transport_cost"].items()):
+            print(f"  Scenario {w}: {val:.4f}")
+
+    if results.get("scenario_unmet_penalty"):
+        print("\nScenario unmet-demand penalties:")
+        for w, val in sorted(results["scenario_unmet_penalty"].items()):
+            print(f"  Scenario {w}: {val:.4f}")
 
     # --- Aggregate release vs demand ---
     total_release = sum(results.get("release", {}).values())

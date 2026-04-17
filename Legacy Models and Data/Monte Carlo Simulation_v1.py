@@ -130,7 +130,7 @@ def export_results(scenarios, json_file='simulation_scenarios.json', csv_file='s
 # Main execution
 if __name__ == "__main__":
     commodities = ['food', 'water']
-    cities = load_city_data('pacific_cities.csv')
+    cities = load_city_data('../pacific_cities.csv')
     G = generate_city_network(cities, commodities)
     scenarios = run_simulation(G, commodities, num_scenarios=100)
     export_results(scenarios)

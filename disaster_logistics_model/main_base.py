@@ -15,7 +15,7 @@ import time
 def main():
     # File paths and constants
     csv_path = "data/pacific_cities.csv"
-    num_scenarios = 100 # Adjust as needed
+    num_scenarios = 5 # Adjust as needed
 
     # Step 1: Build the network
     print("[1/4] Building the geospatial network...")

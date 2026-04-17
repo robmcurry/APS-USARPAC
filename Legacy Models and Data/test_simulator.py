@@ -3,7 +3,7 @@ from disaster_logistics_model.network.network_builder import build_geospatial_ne
 from disaster_logistics_model.monte_carlo.simulator import generate_scenarios
 
 if __name__ == "__main__":
-    csv_path = "disaster_logistics_model/data/pacific_cities.csv"
+    csv_path = "../disaster_logistics_model/data/pacific_cities.csv"
 
     # Build the geospatial network
     G, locations = build_geospatial_network(csv_path)

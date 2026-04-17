@@ -1,5 +1,5 @@
 import os
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import networkx as nx
 import pandas as pd
@@ -60,71 +60,155 @@ def summarize_transport_penalty_scale(results: dict) -> dict:
     }
 
 
-GAMMA_VALUES = [0.0, 0.25, 0.5, 0.75, 1.0]
-NUM_SCENARIOS = 10
-OUTPUT_DIR = "output"
+def load_locations(csv_path: str = "pacific_cities.csv") -> Dict[int, dict]:
+    """
+    Load node metadata from CSV.
+    """
+    df = pd.read_csv(csv_path)
+
+    locations = {}
+    for _, row in df.iterrows():
+        node_id = int(row["Node ID"])
+        locations[node_id] = {
+            "name": row["Node Name"],
+            "lat": float(row["Latitude"]),
+            "lon": float(row["Longitude"]),
+            "pop": float(row["Population"]),
+            "country": row["Country"],
+            "region": row["Region"],
+            "hub_type": str(row["hub_type"]).strip().lower(),
+        }
+
+    print("Loaded columns:", df.columns.tolist())
+    print("Sample location:", next(iter(locations.items())))
+    return locations
 
 
-# --- Build locations from CSV ---
-df = pd.read_csv("pacific_cities.csv")
+def build_test_graph(locations: Dict[int, dict]) -> nx.Graph:
+    """
+    Build a simple graph for testing.
+    Replace this later with your pruned travel-time-feasible graph.
+    """
+    graph = nx.Graph()
 
-locations = {}
-for _, row in df.iterrows():
-    node_id = int(row["Node ID"])
-    locations[node_id] = {
-        "name": row["Node Name"],
-        "lat": float(row["Latitude"]),
-        "lon": float(row["Longitude"]),
-        "pop": float(row["Population"]),
-        "country": row["Country"],
-        "region": row["Region"],
-        "hub_type": str(row["hub_type"]).strip().lower(),
-    }
+    for node_id in locations:
+        graph.add_node(node_id)
 
-print("Loaded columns:", df.columns.tolist())
-print("Sample location:", next(iter(locations.items())))
+    for i in locations:
+        for j in locations:
+            if i != j:
+                graph.add_edge(i, j)
 
-# --- Build a simple graph for testing ---
-G = nx.Graph()
-for i in locations:
-    G.add_node(i)
+    return graph
 
-# Simple fully connected graph (fine for testing only)
-for i in locations:
-    for j in locations:
-        if i != j:
-            G.add_edge(i, j)
 
-# --- Load parameters and generate scenarios once ---
-params = load_parameters()
-scenarios = generate_scenarios(G, locations, num_scenarios=NUM_SCENARIOS)
+def make_output_dir(base_output_dir: str, experiment_name: str) -> str:
+    """
+    Create and return the output directory for one experiment.
+    """
+    experiment_output_dir = os.path.join(base_output_dir, experiment_name)
+    os.makedirs(experiment_output_dir, exist_ok=True)
+    return experiment_output_dir
 
-print("\nScenario keys:", scenarios[0].keys())
-print("Scenario ID:", scenarios[0]["scenario_id"])
-print("Severity:", scenarios[0]["severity"])
-print("Sample node severity:", list(scenarios[0]["node_severity"].items())[:5])
 
-os.makedirs(OUTPUT_DIR, exist_ok=True)
+def save_experiment_outputs(
+    experiment_output_dir: str,
+    summary_rows: List[Dict],
+    scenario_rows: List[Dict],
+    site_rows: List[Dict],
+    flow_rows: List[Dict],
+) -> None:
+    """
+    Save standard output CSVs for one experiment.
+    """
+    summary_df = pd.DataFrame(summary_rows)
+    scenario_df = pd.DataFrame(scenario_rows)
+    site_df = pd.DataFrame(site_rows)
+    flow_df = pd.DataFrame(flow_rows)
 
-summary_rows: List[Dict] = []
-scenario_rows: List[Dict] = []
-site_rows: List[Dict] = []
-flow_rows: List[Dict] = []
+    summary_path = os.path.join(experiment_output_dir, "summary.csv")
+    scenario_path = os.path.join(experiment_output_dir, "scenario_losses.csv")
+    site_path = os.path.join(experiment_output_dir, "selected_sites.csv")
+    flow_path = os.path.join(experiment_output_dir, "flows.csv")
 
-for gamma in GAMMA_VALUES:
-    print(f"\n{'=' * 60}")
-    print(f"Running gamma = {gamma}")
-    print(f"{'=' * 60}")
+    summary_df.to_csv(summary_path, index=False)
+    scenario_df.to_csv(scenario_path, index=False)
+    site_df.to_csv(site_path, index=False)
+    flow_df.to_csv(flow_path, index=False)
+
+    print("\nSaved files:")
+    print(f"  {summary_path}")
+    print(f"  {scenario_path}")
+    print(f"  {site_path}")
+    print(f"  {flow_path}")
+
+    print("\nRun-level summary preview:")
+    print(summary_df)
+
+
+def run_single_experiment(
+    experiment_code: str,
+    experiment_label: str,
+    gamma: float,
+    beta: float,
+    p_max: int,
+    budget: Optional[float],
+    tau: float,
+    rho: float,
+    num_scenarios: int = 10,
+    base_output_dir: str = "output",
+    verbose: bool = False,
+) -> None:
+    """
+    Run one experiment and save outputs to its own folder.
+
+    This assumes your parameter loader returns a mutable dictionary-like object.
+    Update the override keys below to match your actual parameter structure.
+    """
+    print(f"\n{'=' * 70}")
+    print(f"Running {experiment_code}: {experiment_label}")
+    print(f"{'=' * 70}")
+
+    locations = load_locations()
+    graph = build_test_graph(locations)
+
+    params = load_parameters()
+
+    # Parameter overrides
+    params["beta"] = beta
+    params["P_max"] = p_max
+
+    if "inventory_disruption" not in params:
+        params["inventory_disruption"] = {}
+    params["inventory_disruption"]["cutoff_severity"] = tau
+
+    if "safety_stock" not in params["inventory_disruption"]:
+        params["inventory_disruption"]["safety_stock"] = {}
+    params["inventory_disruption"]["safety_stock"]["fraction"] = rho
+
+    if budget is not None:
+        if "prepositioning" not in params:
+            params["prepositioning"] = {}
+        params["prepositioning"]["selection_budget"] = budget
+
+
+    scenarios = generate_scenarios(graph, locations, num_scenarios=num_scenarios)
+
+    print("\nScenario keys:", scenarios[0].keys())
+    print("Scenario ID:", scenarios[0]["scenario_id"])
+    print("Severity:", scenarios[0]["severity"])
+    print("Sample node severity:", list(scenarios[0]["node_severity"].items())[:5])
 
     instance = build_stochastic_instance(
         locations=locations,
-        undirected_edges=list(G.edges()),
+        undirected_edges=list(graph.edges()),
         scenarios=scenarios,
         params=params,
         gamma=gamma,
     )
 
-    results = solve_stochastic_cvar(instance, verbose=False)
+
+    results = solve_stochastic_cvar(instance, verbose=verbose)
     diagnostics = summarize_transport_penalty_scale(results)
 
     total_demand = sum(instance["demand"].values())
@@ -139,6 +223,7 @@ for gamma in GAMMA_VALUES:
     )
     max_scenario_loss = max(scenario_losses.values()) if scenario_losses else None
     min_scenario_loss = min(scenario_losses.values()) if scenario_losses else None
+
     service_rate = None
     if total_demand > 0:
         service_rate = 1.0 - (total_unmet / total_demand)
@@ -147,9 +232,22 @@ for gamma in GAMMA_VALUES:
     for (_, _, commodity), unmet_val in results.get("unmet_demand", {}).items():
         unmet_by_commodity[commodity] += unmet_val
 
+    summary_rows: List[Dict] = []
+    scenario_rows: List[Dict] = []
+    site_rows: List[Dict] = []
+    flow_rows: List[Dict] = []
+
     summary_rows.append(
         {
+            "experiment_code": experiment_code,
+            "experiment_label": experiment_label,
             "gamma": gamma,
+            "beta": beta,
+            "P_max": p_max,
+            "budget_input": budget,
+            "budget_used": instance.get("B"),
+            "tau": tau,
+            "rho": rho,
             "status": results.get("status"),
             "objective_value": results.get("objective_value"),
             "eta": results.get("eta"),
@@ -188,7 +286,15 @@ for gamma in GAMMA_VALUES:
         )
         scenario_rows.append(
             {
+                "experiment_code": experiment_code,
+                "experiment_label": experiment_label,
                 "gamma": gamma,
+                "beta": beta,
+                "P_max": p_max,
+                "budget_input": budget,
+                "budget_used": instance.get("B"),
+                "tau": tau,
+                "rho": rho,
                 "scenario_id": scenario_id,
                 "loss": loss_val,
                 "transport_cost": results.get("scenario_transport_cost", {}).get(scenario_id, 0.0),
@@ -203,22 +309,37 @@ for gamma in GAMMA_VALUES:
     for site in selected_sites:
         site_rows.append(
             {
+                "experiment_code": experiment_code,
+                "experiment_label": experiment_label,
                 "gamma": gamma,
+                "beta": beta,
+                "P_max": p_max,
+                "budget_input": budget,
+                "budget_used": instance.get("B"),
+                "tau": tau,
+                "rho": rho,
                 "node_id": site,
                 "node_name": locations[site]["name"],
                 "country": locations[site]["country"],
                 "region": locations[site]["region"],
             }
         )
+
     flows_dict = results.get("flows", {})
     if flows_dict:
-        for (scenario_id, from_node, to_node, commodity), flow_val in sorted(
-            flows_dict.items()
-        ):
+        for (scenario_id, from_node, to_node, commodity), flow_val in sorted(flows_dict.items()):
             if flow_val > 1e-6:
                 flow_rows.append(
                     {
+                        "experiment_code": experiment_code,
+                        "experiment_label": experiment_label,
                         "gamma": gamma,
+                        "beta": beta,
+                        "P_max": p_max,
+                        "budget_input": budget,
+                        "budget_used": instance.get("B"),
+                        "tau": tau,
+                        "rho": rho,
                         "scenario_id": scenario_id,
                         "from_node": from_node,
                         "from_name": locations[from_node]["name"],
@@ -229,13 +350,19 @@ for gamma in GAMMA_VALUES:
                     }
                 )
     else:
-        for scenario_id, from_node, to_node, commodity, flow_val in results.get(
-            "positive_flows", []
-        ):
+        for scenario_id, from_node, to_node, commodity, flow_val in results.get("positive_flows", []):
             if flow_val > 1e-6:
                 flow_rows.append(
                     {
+                        "experiment_code": experiment_code,
+                        "experiment_label": experiment_label,
                         "gamma": gamma,
+                        "beta": beta,
+                        "P_max": p_max,
+                        "budget_input": budget,
+                        "budget_used": instance.get("B"),
+                        "tau": tau,
+                        "rho": rho,
                         "scenario_id": scenario_id,
                         "from_node": from_node,
                         "from_name": locations[from_node]["name"],
@@ -246,8 +373,12 @@ for gamma in GAMMA_VALUES:
                     }
                 )
 
+    total_flow = sum(results.get("flows", {}).values())
+    num_flows = len(results.get("flows", {}))
+    num_releases = len(results.get("release", {}))
+
     print(
-        f"gamma={gamma} | status={results.get('status')} | "
+        f"{experiment_code} | status={results.get('status')} | "
         f"objective={results.get('objective_value')} | "
         f"selected_sites={selected_sites} | total_unmet={total_unmet}"
     )
@@ -258,10 +389,6 @@ for gamma in GAMMA_VALUES:
         f"transport/penalty={diagnostics['transport_to_penalty_ratio_total']:.6f} | "
         f"transport share of loss={diagnostics['transport_share_of_loss_total']:.6f}"
     )
-    total_flow = sum(results.get("flows", {}).values())
-    num_flows = len(results.get("flows", {}))
-    num_releases = len(results.get("release", {}))
-
     print(
         "flow diagnostics | "
         f"total_release={total_release:.4f} | "
@@ -270,25 +397,13 @@ for gamma in GAMMA_VALUES:
         f"num_flow_entries={num_flows}"
     )
 
-summary_df = pd.DataFrame(summary_rows)
-scenario_df = pd.DataFrame(scenario_rows)
-site_df = pd.DataFrame(site_rows)
-flow_df = pd.DataFrame(flow_rows)
+    experiment_folder = f"{experiment_code}_{experiment_label.lower().replace(' ', '_')}"
+    experiment_output_dir = make_output_dir(base_output_dir, experiment_folder)
 
-summary_path = os.path.join(OUTPUT_DIR, "gamma_sensitivity_summary.csv")
-scenario_path = os.path.join(OUTPUT_DIR, "gamma_sensitivity_scenario_losses.csv")
-site_path = os.path.join(OUTPUT_DIR, "gamma_sensitivity_selected_sites.csv")
-flow_path = os.path.join(OUTPUT_DIR, "gamma_sensitivity_flows.csv")
-
-summary_df.to_csv(summary_path, index=False)
-scenario_df.to_csv(scenario_path, index=False)
-site_df.to_csv(site_path, index=False)
-flow_df.to_csv(flow_path, index=False)
-
-print("\nSaved files:")
-print(f"  {summary_path}")
-print(f"  {scenario_path}")
-print(f"  {site_path}")
-print(f"  {flow_path}")
-print("\nRun-level summary preview:")
-print(summary_df)
+    save_experiment_outputs(
+        experiment_output_dir=experiment_output_dir,
+        summary_rows=summary_rows,
+        scenario_rows=scenario_rows,
+        site_rows=site_rows,
+        flow_rows=flow_rows,
+    )

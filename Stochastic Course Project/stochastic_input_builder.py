@@ -133,6 +133,104 @@ def build_inventory_availability(
     return availability
 
 
+def build_site_cost(
+    locations: Dict[int, Dict],
+    params: Dict,
+) -> Dict[int, float]:
+    """
+    Build node-level fixed site selection cost f[i].
+
+    Supported parameter structures:
+    1. prepositioning.site_cost keyed by hub type, e.g.
+       major/regional/local
+    2. prepositioning.site_cost_by_node keyed by node id
+    3. prepositioning.default_site_cost keyed by hub type with optional
+       prepositioning.site_cost_overrides keyed by node id
+
+    Node-specific overrides take precedence over hub-type defaults.
+    """
+    prepositioning = params.get("prepositioning", {})
+
+    site_cost_by_type = prepositioning.get("site_cost", {})
+    site_cost_by_node = prepositioning.get("site_cost_by_node", {})
+    default_site_cost = prepositioning.get("default_site_cost", {})
+    site_cost_overrides = prepositioning.get("site_cost_overrides", {})
+
+    node_cost_lookup = {
+        int(node_id): float(cost)
+        for node_id, cost in site_cost_by_node.items()
+    }
+    override_lookup = {
+        int(node_id): float(cost)
+        for node_id, cost in site_cost_overrides.items()
+    }
+
+    type_cost_lookup = site_cost_by_type if site_cost_by_type else default_site_cost
+    type_cost_lookup = {
+        str(hub_type).strip().lower(): float(cost)
+        for hub_type, cost in type_cost_lookup.items()
+    }
+
+    site_cost = {}
+    for i, data in locations.items():
+        if i in override_lookup:
+            site_cost[i] = override_lookup[i]
+            continue
+
+        if i in node_cost_lookup:
+            site_cost[i] = node_cost_lookup[i]
+            continue
+
+        hub_type = str(data.get("hub_type", "local")).strip().lower()
+        if hub_type not in type_cost_lookup:
+            raise KeyError(
+                f"Missing site selection cost for hub type '{hub_type}' at node {i}."
+            )
+
+        site_cost[i] = type_cost_lookup[hub_type]
+
+    return site_cost
+
+
+def build_selection_budget(params: Dict) -> float:
+    """
+    Build scalar preposition site selection budget B.
+    """
+    prepositioning = params.get("prepositioning", {})
+    if "selection_budget" not in prepositioning:
+        raise KeyError(
+            "Missing required parameter 'prepositioning.selection_budget'."
+        )
+    return float(prepositioning["selection_budget"])
+
+
+def build_arc_cost(
+    locations: Dict[int, Dict],
+    arcs: List[Tuple[int, int]],
+    params: Dict,
+) -> Dict[Tuple[int, int], float]:
+    """
+    Build per-unit transportation cost c[i,j] on each directed arc based on
+    great-circle arc length.
+
+    c[i,j] = cost_per_unit_km * distance_km(i,j)
+    """
+    transportation = params.get("transportation", {})
+    if "cost_per_unit_km" not in transportation:
+        raise KeyError(
+            "Missing required parameter 'transportation.cost_per_unit_km'."
+        )
+
+    cost_per_unit_km = float(transportation["cost_per_unit_km"])
+    arc_cost = {}
+
+    for i, j in arcs:
+        coords_i = (float(locations[i]["lat"]), float(locations[i]["lon"]))
+        coords_j = (float(locations[j]["lat"]), float(locations[j]["lon"]))
+        distance_km = geodesic(coords_i, coords_j).kilometers
+        arc_cost[(i, j)] = cost_per_unit_km * distance_km
+
+    return arc_cost
 
 def build_nominal_arc_capacity(
     locations: Dict[int, Dict],
@@ -142,21 +240,36 @@ def build_nominal_arc_capacity(
     """
     Build nominal arc capacity U[i,j] in person-day units.
 
-    U[i,j] = throughput_days * max(pop_i, pop_j)
+    Each node is assigned a logistics handling capacity c_i based on its
+    hub_type classification. Arc capacity is then defined by the weaker
+    endpoint:
+
+        U[i,j] = min(c_i, c_j)
+
+    This reflects the assumption that corridor throughput is constrained by
+    the lesser terminal handling capability rather than surrounding population.
     """
     nominal_capacity = {}
-    throughput_days = float(
-        params.get("nominal_arc_capacity", {}).get("throughput_days", 3)
-    )
+    hub_capacity = params.get("nominal_arc_capacity", {}).get("hub_capacity", {})
 
     for i, j in arcs:
-        pop_i = float(locations[i].get("pop", 0.0))
-        pop_j = float(locations[j].get("pop", 0.0))
-        pop_max = max(pop_i, pop_j)
-        nominal_capacity[(i, j)] = throughput_days * pop_max
+        hub_type_i = str(locations[i].get("hub_type", "local")).strip().lower()
+        hub_type_j = str(locations[j].get("hub_type", "local")).strip().lower()
+
+        if hub_type_i not in hub_capacity:
+            raise KeyError(
+                f"Missing nominal arc capacity for hub type '{hub_type_i}' at node {i}."
+            )
+        if hub_type_j not in hub_capacity:
+            raise KeyError(
+                f"Missing nominal arc capacity for hub type '{hub_type_j}' at node {j}."
+            )
+
+        c_i = float(hub_capacity[hub_type_i])
+        c_j = float(hub_capacity[hub_type_j])
+        nominal_capacity[(i, j)] = min(c_i, c_j)
 
     return nominal_capacity
-
 
 def build_residual_arc_capacity(
     arcs: List[Tuple[int, int]],
@@ -249,6 +362,9 @@ def build_stochastic_instance(
         scenarios=scenarios,
         cutoff_severity=inventory_cutoff_severity,
     )
+    site_cost = build_site_cost(locations, params)
+    selection_budget = build_selection_budget(params)
+    arc_cost = build_arc_cost(locations, arcs, params)
     nominal_arc_capacity = build_nominal_arc_capacity(locations, arcs, params)
     residual_arc_capacity = build_residual_arc_capacity(
         arcs=arcs,
@@ -271,9 +387,15 @@ def build_stochastic_instance(
         "nominal_arc_capacity": nominal_arc_capacity,
         "residual_arc_capacity": residual_arc_capacity,
         "penalty": penalty,
+        "site_cost": site_cost,
+        "selection_budget": selection_budget,
+        "B": selection_budget,
+        "arc_cost": arc_cost,
         "gamma": float(gamma),
         "safety_stock_fraction": safety_stock_fraction,
+        "rho": safety_stock_fraction,
         "inventory_cutoff_severity": inventory_cutoff_severity,
+        "tau": inventory_cutoff_severity,
         "P_max": int(params.get("P_max", 5)),
         "beta": float(params.get("beta", 0.9)),
     }

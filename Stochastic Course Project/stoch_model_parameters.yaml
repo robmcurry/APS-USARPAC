@@ -32,6 +32,23 @@ nominal_arc_capacity:
   throughput_days: 3
 
 inventory_disruption:
-  cutoff_severity: 4.0
+  cutoff_severity: 5.0
   safety_stock:
     fraction: 0.25
+
+nominal_arc_capacity:
+  hub_capacity:
+    major: 3000000
+    regional: 1000000
+    local: 250000
+
+prepositioning:
+  selection_budget: 12
+
+  site_cost:
+    major: 3
+    regional: 2
+    local: 1
+
+transportation:
+  cost_per_unit_km: 0.0001
