@@ -118,7 +118,7 @@ if __name__ == "__main__":
             budget=exp["budget"],
             tau=exp["tau"],
             rho=exp["rho"],
-            num_scenarios=10,
+            num_scenarios=100,
             base_output_dir="output",
             verbose=False,
         )
