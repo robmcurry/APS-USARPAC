@@ -1,0 +1,12 @@
+# macOS junk
+.DS_Store
+
+# Python bytecode
+__pycache__/
+*.pyc
+
+# Local Claude Code settings
+.claude/settings.local.json
+
+# Generated results, reports, logs, and figures
+output/

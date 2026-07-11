@@ -1,0 +1,51 @@
+Node ID,Node Name,Latitude,Longitude,Population,Country,Country ISO,Region,hub_type,ppl_eligible,tier,S,A,L,R
+1,Tokyo / Yokosuka,35.4437,139.638,37400068,Japan,JPN,East Asia,major,Y,PPL-1,3,3,3,3
+2,Osaka,34.6937,135.5023,19059856,Japan,JPN,East Asia,regional,Y,PPL-2,3,3,3,3
+3,Sapporo,43.0618,141.3545,1973395,Japan,JPN,East Asia,regional,Y,PPL-2,3,3,2,2
+4,Fukuoka / Sasebo,33.5902,130.4017,5551699,Japan,JPN,East Asia,regional,Y,PPL-2,3,3,3,3
+5,Nagoya,35.1815,136.9066,9552000,Japan,JPN,East Asia,regional,Y,PPL-2,3,3,3,3
+6,Sydney,-33.8688,151.2093,5312000,Australia,AUS,Oceania,regional,Y(C),PPL-2,3,3,3,3
+7,Melbourne,-37.8136,144.9631,5078000,Australia,AUS,Oceania,regional,Y(C),PPL-2,3,3,3,3
+8,Brisbane,-27.4698,153.0251,2560000,Australia,AUS,Oceania,regional,Y(C),PPL-2,3,3,3,3
+9,Perth,-31.9505,115.8605,2144000,Australia,AUS,Oceania,regional,Y(C),PPL-2,3,3,2,2
+10,Adelaide,-34.9285,138.6007,1402000,Australia,AUS,Oceania,regional,Y(C),PPL-2,3,3,2,2
+11,Darwin,-12.4634,130.8456,148000,Australia,AUS,Oceania,regional,Y,PPL-2,3,3,2,0
+12,Wellington,-41.2865,174.7762,215000,New Zealand,NZL,Oceania,local,No,,1,2,2,2
+13,Auckland,-36.8485,174.7633,1717000,New Zealand,NZL,Oceania,local,No,,1,3,3,2
+14,Noumea,-22.2758,166.458,94285,New Caledonia,NCL,Melanesia,local,No,,1,3,1,0
+15,Port Moresby,-9.4438,147.1803,399000,PNG,PNG,Melanesia,local,Y(C),PPL-3,1,3,1,0
+16,Honiara,-9.4319,160.0413,67000,Solomon Islands,SLB,Melanesia,local,No,,1,2,1,0
+17,Suva,-18.1416,178.4419,93970,Fiji,FJI,Melanesia,local,No,,3,3,1,0
+18,Apia,-13.8333,-171.7667,38000,Samoa,WSM,Polynesia,local,No,,3,3,1,0
+19,Nuku'alofa,-21.1394,-175.2049,27000,Tonga,TON,Polynesia,local,No,,3,3,1,0
+20,Majuro,7.1167,171.3667,23156,Marshall Islands,MHL,Micronesia,local,Y(C),PPL-3,3,2,1,0
+21,Tarawa,1.3282,173.0176,73073,Kiribati,KIR,Micronesia,local,No,,1,2,1,0
+22,Palikir,6.9172,158.1589,6964,Micronesia,FSM,Micronesia,local,Y(C),PPL-3,1,2,1,0
+23,Yaren,-0.5477,166.9212,1100,Nauru,NRU,Micronesia,local,No,,3,2,1,0
+24,Koror,7.3419,134.4797,11000,Palau,PLW,Micronesia,local,Y(C),PPL-3,3,2,1,0
+25,Jayapura,-2.5916,140.669,397000,Indonesia,IDN,Southeast Asia,local,No,,0,3,1,0
+26,Davao,7.1907,125.4553,1776949,Philippines,PHL,Southeast Asia,local,Y(C),PPL-3,0,3,2,0
+27,Manila,14.5896,120.9796,14400000,Philippines,PHL,Southeast Asia,regional,Y(C),PPL-2,3,3,3,2
+28,Cebu,10.3157,123.8854,1000000,Philippines,PHL,Southeast Asia,local,Y(C),PPL-3,1,3,2,0
+29,Jakarta,-6.2088,106.8456,34540000,Indonesia,IDN,Southeast Asia,local,No,,3,3,3,2
+30,Denpasar,-8.6705,115.2126,897300,Indonesia,IDN,Southeast Asia,local,No,,1,3,2,0
+31,Bandar Seri Begawan,4.9031,114.9398,279924,Brunei,BRN,Southeast Asia,local,No,,1,3,2,0
+32,Kota Kinabalu,5.9804,116.0735,579000,Malaysia,MYS,Southeast Asia,local,No,,1,3,2,0
+33,Kuching,1.5497,110.3628,700000,Malaysia,MYS,Southeast Asia,local,No,,0,3,1,0
+34,Ho Chi Minh City,10.8231,106.6297,9320000,Vietnam,VNM,Southeast Asia,local,No,,1,3,3,2
+35,Hanoi,21.0278,105.8342,5253000,Vietnam,VNM,Southeast Asia,local,No,,1,3,2,2
+36,Vientiane,17.9757,102.6331,948000,Laos,LAO,Southeast Asia,local,No,,0,3,1,1
+37,Phnom Penh,11.5564,104.9282,2281951,Cambodia,KHM,Southeast Asia,local,No,,0,3,2,1
+38,Singapore,1.3521,103.8198,5917600,Singapore,SGP,Southeast Asia,regional,Y,PPL-2,3,3,2,0
+39,Da Nang,16.0544,108.2022,1134310,Vietnam,VNM,Southeast Asia,local,No,,3,3,2,1
+40,Makassar,-5.1477,119.4328,1423877,Indonesia,IDN,Southeast Asia,local,No,,1,3,1,0
+41,Medan,3.5952,98.6722,2435252,Indonesia,IDN,Southeast Asia,local,No,,1,3,2,1
+42,Honolulu,21.3069,-157.8583,1016508,USA,USA,East Pacific,major,Y,PPL-1,3,3,3,2
+43,Bangkok,13.7563,100.5018,10539000,Thailand,THA,Southeast Asia,local,No,,1,3,3,2
+44,Yangon,16.8661,96.1951,5340000,Myanmar,MMR,Southeast Asia,local,No,,1,3,1,0
+45,Taipei,25.033,121.5654,2646204,Taiwan,TWN,East Asia,local,No,,3,3,3,2
+46,Seoul / Busan,35.1796,129.0756,9416000,South Korea,KOR,East Asia,major,Y,PPL-1,3,3,3,3
+47,Guam (Apra),13.4443,144.7937,153836,USA Territory,GUM,Micronesia,major,Y,PPL-1,3,3,3,0
+48,Shanghai,31.2304,121.4737,28516904,China,CHN,East Asia,local,No,,1,1,1,0
+49,Guangzhou,23.1291,113.2644,18676605,China,CHN,East Asia,local,No,,1,1,1,0
+50,Chengdu,30.5728,104.0668,9059000,China,CHN,East Asia,local,No,,1,1,1,0

@@ -1,0 +1,423 @@
+# model_parameters.yaml
+#
+# Single consolidated config for the aps_usarpac stochastic CVaR pipeline.
+# Replaces the four-way split (config/stoch_model_parameters.yaml shim,
+# model/model_config.yaml, network/data/network_config.yaml,
+# scenarios/scenario_config.yaml) that resulted from the DST restructure.
+# That split was never fully wired up: only the shim was ever read via
+# load_parameters(), so model_config.yaml's `vehicles` block and
+# network_config.yaml's `modal_capacity` block were either silently
+# unused (vehicles) or only read via a separate direct-file-load path
+# (modal_capacity, in network/build_modal_arcs.py). This file merges
+# everything back into one source of truth loaded through
+# config.loader.load_parameters().
+#
+# Conflicts found during consolidation and how they were resolved:
+#   - transportation.cost_per_unit_km: shim had 0.0001, model_config.yaml
+#     had 0.005. Neither is actually read by the solver today (input_builder.py
+#     hardcodes dist_km * 0.0001 directly) -- kept at 0.0001 to match the
+#     hardcoded behavior.
+#   - nominal_arc_capacity.hub_capacity: shim had major=1000000, network_config
+#     had major=3000000. This block is dead legacy config (build_nominal_arc_capacity()
+#     was removed from the pipeline; modal_capacity below is what's actually
+#     used) -- dropped entirely rather than kept as stale documentation.
+
+# =============================================================================
+# SCENARIO GENERATION
+# (previously scenarios/scenario_config.yaml, duplicated in the shim)
+# =============================================================================
+
+# random seed for scenario generation - fixed so results are reproducible
+seed: 32
+
+# total number of disaster scenarios to generate per run
+num_scenarios: 100
+
+# food and water are the two commodity types in the model
+commodities:
+  - food
+  - water
+
+# default disaster shape parameters used by the scenario generator
+default_disaster:
+  # documents the severity scale used throughout the model (1=minor 5=catastrophic)
+  # the kumaraswamy mapping below hardcodes this same 1-5 range
+  severity_range: [1.0, 5.0]
+  # kumaraswamy distribution parameters fitted to emdat total affected population data
+  # a=2.417 b=3.747 gives mode around 2.95 - most disasters are moderate severity
+  kumaraswamy_a: 2.417
+  kumaraswamy_b: 3.747
+  # affected radius grows with severity - at severity 5 the radius reaches 1750km
+  affected_radius_km:
+    # baseline radius applied even at zero severity
+    base: 250
+    # additional km of radius added per unit of severity
+    multiplier: 250
+
+# multinomial epicenter sampling weights by country iso code
+# derived from emdat disaster frequency 2000-2026 across the usarpac region
+# china 23.4% indonesia 15.4% philippines 14.3% are the three highest-risk countries
+epicenter_weights:
+  CHN: 0.2340
+  IDN: 0.1540
+  PHL: 0.1430
+  VNM: 0.0740
+  JPN: 0.0620
+  AUS: 0.0470
+  THA: 0.0450
+  MYS: 0.0300
+  TWN: 0.0270
+  KOR: 0.0240
+  MMR: 0.0220
+  PNG: 0.0200
+  NZL: 0.0140
+  LAO: 0.0110
+  KHM: 0.0110
+  GUM: 0.0059
+  USA: 0.0059
+  SGP: 0.0059
+  BRN: 0.0059
+  FJI: 0.0059
+  WSM: 0.0059
+  TON: 0.0059
+  MHL: 0.0059
+  KIR: 0.0059
+  FSM: 0.0059
+  NRU: 0.0059
+  PLW: 0.0059
+  SLB: 0.0059
+  NCL: 0.0059
+
+# disaster type sampling - draws a disaster_type per scenario from
+# country-conditional EM-DAT frequencies (scenarios/data/country_type_frequencies.csv)
+type_sampling:
+  enabled: true
+  # fallback used when country not found in EM-DAT frequency table
+  # values are global marginal frequencies from EM-DAT 2000-2026, renormalized
+  # to sum to 1.0 (original calibration output summed to 0.897 -- leftover
+  # probability mass from EM-DAT disaster types outside the six modeled here,
+  # e.g. drought/extreme temperature, that was never dropped before writing
+  # these out). random.choices() already renormalizes weights internally, so
+  # this changes nothing about actual sampling behavior -- it only makes the
+  # documented numbers match what the code has always actually drawn from.
+  # Relative ratios between types are unchanged from the original values.
+  fallback_distribution:
+    flood: 0.4125
+    storm: 0.3623
+    earthquake: 0.1260
+    volcanic: 0.0301
+    mass_movement: 0.0513
+    wildfire: 0.0178
+
+# transport-mode degradation multipliers gamma[mode][disaster_type] - starting
+# values for sensitivity analysis, to be calibrated with SME input
+degradation_matrix:
+  air:
+    flood: 0.3
+    storm: 0.9
+    earthquake: 0.5
+    volcanic: 1.0
+    mass_movement: 0.2
+    wildfire: 0.4
+  sea:
+    flood: 0.2
+    storm: 0.7
+    earthquake: 0.3
+    volcanic: 0.2
+    mass_movement: 0.1
+    wildfire: 0.1
+  land:
+    flood: 0.9
+    storm: 0.5
+    earthquake: 1.0
+    volcanic: 0.6
+    mass_movement: 0.8
+    wildfire: 0.3
+
+# =============================================================================
+# NETWORK / ARCS
+# (previously network/data/network_config.yaml, duplicated in the shim)
+# =============================================================================
+
+# ship speed assumption used to compute maximum feasible arc distance
+ship_km_per_day: 1500
+
+# maximum days of transit allowed per commodity - caps which arcs are active
+max_voyage_days:
+  water: 3
+  food: 3
+
+# modal arc layers: maritime, air, terrestrial
+# arc existence rules, capacity derivation, and degradation sensitivity per mode
+# loaded directly by network/build_modal_arcs.py
+modal_capacity:
+
+  maritime:
+    # asset counts per PPL tier
+    assets:
+      PPL-1: 2        # 2x T-AKR (LMSR)
+      PPL-2: 1        # 1x T-AKE
+      PPL-3: 0        # no maritime assets at contingency sites
+    # discharge rates in metric tons per 72-hour window per vessel
+    discharge_mt_per_window:
+      TAKR: 4500      # T-AKR: 1500 MT/day x 3 days
+      TAKE: 1500      # T-AKE: 500 MT/day x 3 days
+    # vessel type per tier
+    vessel_type:
+      PPL-1: TAKR
+      PPL-2: TAKE
+      PPL-3: none
+    # person-days per metric ton by commodity, on the Sphere/WFP basis used by
+    # the vehicle capacity derivation (previously 6667/500 at 0.15 kg/person/day
+    # food and 2 L/person/day water -- an inconsistent second ration assumption)
+    pd_per_mt:
+      food: 1852      # 1000 kg/MT / 0.54 kg/person-day (WFP standard emergency ration, 540 g dry weight)
+      water: 66.7     # 1000 kg/MT / 15 kg/person-day (Sphere minimum 15 L/person/day)
+    # arc existence threshold: both endpoints must meet this minimum Sea rating
+    min_rating: 2
+    # maximum arc distance in km (1500 km/day x 3 days)
+    max_distance_km: 4500
+
+  air:
+    # asset counts per PPL tier (C-17 equivalents)
+    assets:
+      PPL-1: 4        # 4x C-17 equivalent
+      PPL-2: 2        # 2x C-17 equivalent
+      PPL-3: 1        # 1x C-130 equivalent (different aircraft class)
+    # payload in metric tons per sortie
+    payload_mt:
+      C17: 77
+      C130: 20
+    # sorties per 72-hour window per aircraft
+    sorties_per_window:
+      C17: 2
+      C130: 3
+    # aircraft type per tier
+    aircraft_type:
+      PPL-1: C17
+      PPL-2: C17
+      PPL-3: C130
+    # person-days per metric ton by commodity (same Sphere/WFP basis as maritime)
+    pd_per_mt:
+      food: 1852
+      water: 66.7
+    # arc existence threshold: both endpoints must meet this minimum Air rating
+    min_rating: 2
+    # maximum arc distance in km (C-17 unrefueled range)
+    max_distance_km: 6000
+
+  terrestrial:
+    # throughput in metric tons per day by road quality (Land rating)
+    road_mt_per_day:
+      3: 500          # paved network, warehouse infrastructure
+      2: 200          # partial road network
+      1: 50           # unpaved or degraded
+    # additional rail throughput in metric tons per day by Rail rating
+    rail_mt_per_day:
+      3: 300          # operational cargo rail
+      2: 100          # limited rail
+      1: 0            # passenger only or degraded, no meaningful freight
+    # planning window in days
+    window_days: 3
+    # person-days per metric ton by commodity (same Sphere/WFP basis as other modes)
+    pd_per_mt:
+      food: 1852
+      water: 66.7
+    # arc existence: only manually defined contiguous pairs (see below)
+    # min_rating not applicable -- existence determined by manual pair list
+
+# =============================================================================
+# MODEL (CVaR objective, site selection, inventory, demand, vehicles)
+# (previously model/model_config.yaml, duplicated in the shim)
+# =============================================================================
+
+# cvar risk parameter - 0.9 means we optimize the worst 10% of scenarios
+# chose cvar over expected value because it explicitly protects against tail disasters
+beta: 0.9
+
+# gurobi relative MIP gap target, applied via model.Params.MIPGap in
+# model/model.py's solve_stochastic_cvar(). Single source of truth for every
+# script that calls solve_stochastic_cvar (sensitivity_runner, convergence
+# stage 1/2, toy_vehicle_test) -- change here rather than at each call site.
+mip_gap: 1.0
+
+# maximum number of ppl sites the model can activate
+P_max: 3
+
+# inventory disruption rules - controls when a site loses the ability to release stock
+inventory_disruption:
+  # if node severity reaches or exceeds this value the node cannot release inventory
+  # models the reality that a severely hit site cannot function as a supply origin
+  cutoff_severity: 5.0
+  safety_stock:
+    # fraction of inventory held back as safety stock at each active site
+    # this portion is never releasable even when the site is selected and undamaged
+    fraction: 0.20
+
+# first-stage site selection rules
+prepositioning:
+  # total budget units available for site selection
+  # site costs are major=3 regional=2 local=1 so a budget of 12 allows flexible combinations
+  selection_budget: 12
+
+  # per-site cost charged against selection_budget, keyed by hub type
+  site_cost:
+    major: 1
+    regional: 1
+    local: 1
+
+# second-stage transportation cost settings
+transportation:
+  # transportation cost per unit per kilometer
+  # NOTE: not currently read by the solver -- model/input_builder.py hardcodes
+  # dist_km * 0.0001 directly. Kept here at the same value for consistency in
+  # case this is wired back up; see consolidation note at top of file.
+  cost_per_unit_km: 0.0001
+
+# intermodal transfer cost multipliers theta[m1][m2], applied per unit of
+# commodity transferred between modes at a node (dimensionless, consistent
+# with modal arc cost scale). Migrated from hardcoded values in
+# model/input_builder.py build_transfer_cost(); placeholder values pending
+# SME calibration.
+transfer_costs:
+  sea_air: 15.0
+  sea_land: 2.5
+  air_land: 4.0
+  land_sea: 3.5
+  land_air: 6.0
+  air_sea: 10.0
+
+# inventory capacity by ppl tier in person-days
+inventory:
+  # ppl-1 strategic hubs hold a full theater prepositioning set
+  # ppl-2 operational nodes hold partial stocks
+  # ppl-3 contingency sites hold emergency cache only
+  # none = non-ppl nodes, which carry zero inventory regardless of selection
+  tier_capacity:
+    PPL-1: 1300000
+    PPL-2: 600000
+    PPL-3: 150000
+    None: 0
+
+# legacy per-capita usage rates - not referenced by the current demand formula
+# demand is now computed from time_bins.*.demand_alpha below, kept for reference
+units_per_person_per_day:
+  water: 1.0
+  food: 1.0
+
+# legacy inventory coverage assumption - not referenced by the current tier-based
+# inventory model, see inventory.tier_capacity above for the active values
+inventory_coverage_days:
+  water: 3
+  food: 7
+
+# time bins define the three disaster response phases
+# bin_1 is the aps prepositioning window - model currently operates on bin_1 only
+# bins 2 and 3 are reserved for future multi-phase extension pending sme calibration
+# to switch bins change active_bin and re-run - no code changes required
+time_bins:
+  bin_1:
+    label: "immediate"
+    window_hours: 72
+    window_days: 3
+    # fraction of affected population requiring support in this window
+    # calibrated from humanitarian logistics literature
+    # requires usarpac j4 validation before operational use
+    demand_alpha:
+      food: 0.15
+      water: 0.20
+    # penalty per unit of unmet demand in this window
+    # highest penalty reflects life-safety stakes in first 72 hours
+    # set >> max modal_arc_cost (distance_km/1000 ≈ 3-12) so the solver
+    # always prefers routing over leaving demand unmet
+    unmet_penalty: 500.0
+    # maximum transit days for demand-satisfying delivery
+    # arcs exceeding this threshold do not contribute to demand satisfaction
+    max_transit_days: 3
+
+  bin_2:
+    label: "transition"
+    window_hours: 96
+    window_days: 4
+    # placeholder values - require sme calibration with usarpac j4
+    demand_alpha:
+      food: 0.25
+      water: 0.30
+    # lower penalty than bin_1 - transition phase is less immediately life-critical
+    unmet_penalty: 300.0
+    max_transit_days: 4
+
+  bin_3:
+    label: "sustainment"
+    window_hours: 336
+    window_days: 14
+    # placeholder values - require sme calibration with usarpac j4
+    demand_alpha:
+      food: 0.60
+      water: 0.60
+    # lowest penalty - sustainment phase is addressable by global supply chain
+    unmet_penalty: 100.0
+    max_transit_days: 14
+
+# active bin for current model run
+# bin_1 = 0-72 hour aps prepositioning window
+# bin_2 = 72-96 hour transition phase (placeholder - pending sme calibration)
+# bin_3 = 96 hour to two week sustainment phase (placeholder - pending sme calibration)
+active_bin: bin_1
+
+# vehicle heterogeneity parameters
+# each vehicle type has a mode, fleet size, basing rating threshold,
+# speed, turnaround time, payload, and per-commodity capacity in person-days
+# read via params.get("vehicles", {}) in model/input_builder.py -- this was the
+# key that was orphaned by the four-way config split (see consolidation note
+# at top of file): model/model_config.yaml was never loaded by load_parameters(),
+# so has_vehicles was always False and the model always ran in its
+# non-vehicle-extended mode until this consolidation.
+vehicles:
+  C-17:
+    mode: air
+    fleet_size: 12
+    min_rating_field: A
+    min_rating_value: 3
+    basing_tiers: ["PPL-1"]
+    cruise_speed_km_day: 11662
+    turnaround_hours: 2
+    payload_kg: 77500
+    capacity:
+      food: 143519
+      water: 5167
+  C-130J:
+    mode: air
+    fleet_size: 16
+    min_rating_field: A
+    min_rating_value: 2
+    basing_tiers: ["PPL-1"]
+    cruise_speed_km_day: 7840
+    turnaround_hours: 2
+    payload_kg: 19051
+    capacity:
+      food: 35280
+      water: 1270
+  LCU-1700:
+    mode: sea
+    fleet_size: 8
+    min_rating_field: S
+    min_rating_value: 2
+    basing_tiers: ["PPL-1"]
+    cruise_speed_km_day: 408
+    turnaround_hours: 6
+    payload_kg: 154221
+    capacity:
+      food: 285594
+      water: 10281
+  M1083:
+    mode: land
+    fleet_size: 60
+    min_rating_field: L
+    min_rating_value: 1
+    cruise_speed_km_day: 1116
+    turnaround_hours: 1
+    payload_kg: 4536
+    capacity:
+      food: 8400
+      water: 302
