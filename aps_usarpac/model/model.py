@@ -43,6 +43,7 @@ def solve_stochastic_cvar(
     verbose: bool = True,
     detailed_extraction: bool = False,
     build_only: bool = False,
+    vehicle_formulation: str = "aggregate",
 ) -> Dict[str, Any]:
     """
     Solve the extensive-form CVaR stochastic prepositioning model.
@@ -61,6 +62,12 @@ def solve_stochastic_cvar(
             model.optimize()). Returns {"model": model, "variables": {...}}
             only -- no solution fields. For problem-size inspection
             (analysis/problem_size_certificate.py) without paying for a solve.
+        vehicle_formulation: "aggregate" (default) uses the existing
+            n^omega_{k,m,ij} integer-vehicle-count formulation, unchanged.
+            "individual" selects the per-vehicle-instance binary formulation
+            under development on the individual-vehicle-indexing branch --
+            not yet implemented, raises NotImplementedError. Callers that
+            don't pass this at all get "aggregate", i.e. current behavior.
 
     Returns:
         results dictionary with selected sites, objective value, and solution details
@@ -197,17 +204,22 @@ def solve_stochastic_cvar(
 
     # n[w,k,m,i,j] - integer vehicle count: number of type-k vehicles of mode m
     # traversing arc (i,j) in scenario w; only defined for k in K_m[m]
-    if has_vehicles:
-        n_keys = [
-            (w, k, m, i, j)
-            for w in Omega
-            for m in modes
-            for k in K_m.get(m, [])
-            for (i, j) in modal_arcs[m]
-        ]
-        n = model.addVars(n_keys, lb=0, vtype=GRB.INTEGER, name="n")
+    if vehicle_formulation == "aggregate":
+        if has_vehicles:
+            n_keys = [
+                (w, k, m, i, j)
+                for w in Omega
+                for m in modes
+                for k in K_m.get(m, [])
+                for (i, j) in modal_arcs[m]
+            ]
+            n = model.addVars(n_keys, lb=0, vtype=GRB.INTEGER, name="n")
+        else:
+            n = {}
+    elif vehicle_formulation == "individual":
+        raise NotImplementedError("individual vehicle formulation not yet implemented")
     else:
-        n = {}
+        raise ValueError(f"unknown vehicle_formulation: {vehicle_formulation!r}")
 
     # g[w,k,j] (McCormick auxiliary for the p_j-coupled turnaround exemption in
     # constraint 19) is created further below, only inside the has_vehicles
@@ -365,121 +377,126 @@ def solve_stochastic_cvar(
                 )
 
     # --- Vehicle-heterogeneity constraints (16-19) ---
-    if has_vehicles:
-        # (16) Vehicle Conservation with p_j coupling:
-        # vehicles departing node j <= vehicles arriving at j + b_{k,j}*p_j
-        for w in Omega:
-            for m in modes:
-                for k in K_m.get(m, []):
-                    b_kj = vehicle_types[k]["b_kj"]
-                    for j in N:
-                        arrivals = gp.quicksum(
-                            n[w, k, m, i_src, j]
-                            for (i_src, _) in modal_incoming[m][j]
-                        )
-                        departures = gp.quicksum(
-                            n[w, k, m, j, j_dst]
-                            for (_, j_dst) in modal_outgoing[m][j]
-                        )
-                        b_val = b_kj.get(j, 0)
-                        basing_term = b_val * p[j] if (b_val > 0 and j in PPL_set) else 0
-                        model.addConstr(
-                            arrivals + basing_term >= departures,
-                            name=f"VehicleConservation_w{w}_k{k}_j{j}",
-                        )
-
-        # (17) Fleet Size — REMOVED. The original constraint capped total
-        # vehicle-arc-traversals at F_k, which prevented multi-leg routing:
-        # a vehicle flying A->B->C consumed 2 of the F_k budget, limiting
-        # 12 C-17s to 12 total legs rather than 12 vehicles each flying
-        # multiple legs. Vehicle conservation (16) already prevents using
-        # more vehicles than are based+arrived, and the distance budget (19)
-        # already caps total fleet-wide travel. Together they bound vehicle
-        # usage without artificially restricting multi-leg operations.
-
-        # (18) Vehicle-Capacity-Constrained Flow, per resource (option A):
-        # independent per-resource capacity — a vehicle could be credited with
-        # a full food load and full water load simultaneously (known simplification)
-        for w in Omega:
-            for m in modes:
-                for (i, j) in modal_arcs[m]:
-                    for r in R:
-                        model.addConstr(
-                            x[w, m, i, j, r] <= gp.quicksum(
-                                vehicle_types[k]["capacity"][r] * n[w, k, m, i, j]
-                                for k in K_m.get(m, [])
-                            ),
-                            name=f"VehicleCapFlow_w{w}_m{m}_i{i}_j{j}_r{r}",
-                        )
-
-        # (19) Fleet-Wide Distance Budget with p_j-coupled turnaround:
-        # Turnaround charged at ALL nodes; exemption at base nodes only when
-        # the site is selected (b_{k,j}*p_j > 0). The product outbound*p_j
-        # is linearized via auxiliary variable g (McCormick, exact for binary p).
-        base_nodes_by_k: Dict[str, List[int]] = {}
-        for k_name, vtype in vehicle_types.items():
-            b_kj = vtype["b_kj"]
-            base_nodes_by_k[k_name] = [
-                j for j in N if b_kj.get(j, 0) > 0 and j in PPL_set
-            ]
-
-        g_keys = [
-            (w, k_name, j)
-            for k_name in vehicle_types
-            for w in Omega
-            for j in base_nodes_by_k[k_name]
-        ]
-        g = model.addVars(g_keys, lb=0.0, vtype=GRB.CONTINUOUS, name="g_turn") if g_keys else {}
-
-        for k_name, vtype in vehicle_types.items():
-            m_veh = vtype["mode"]
-            F_k = vtype["fleet_size"]
+    if vehicle_formulation == "aggregate":
+        if has_vehicles:
+            # (16) Vehicle Conservation with p_j coupling:
+            # vehicles departing node j <= vehicles arriving at j + b_{k,j}*p_j
             for w in Omega:
-                for j in base_nodes_by_k[k_name]:
-                    outbound_j = gp.quicksum(
-                        n[w, k_name, m_veh, j, j_dst]
-                        for (_, j_dst) in modal_outgoing[m_veh][j]
-                    )
-                    model.addConstr(
-                        g[w, k_name, j] <= F_k * p[j],
-                        name=f"TurnExemptUB1_w{w}_k{k_name}_j{j}",
-                    )
-                    model.addConstr(
-                        g[w, k_name, j] <= outbound_j,
-                        name=f"TurnExemptUB2_w{w}_k{k_name}_j{j}",
-                    )
-                    model.addConstr(
-                        g[w, k_name, j] >= outbound_j - F_k * (1 - p[j]),
-                        name=f"TurnExemptLB_w{w}_k{k_name}_j{j}",
-                    )
+                for m in modes:
+                    for k in K_m.get(m, []):
+                        b_kj = vehicle_types[k]["b_kj"]
+                        for j in N:
+                            arrivals = gp.quicksum(
+                                n[w, k, m, i_src, j]
+                                for (i_src, _) in modal_incoming[m][j]
+                            )
+                            departures = gp.quicksum(
+                                n[w, k, m, j, j_dst]
+                                for (_, j_dst) in modal_outgoing[m][j]
+                            )
+                            b_val = b_kj.get(j, 0)
+                            basing_term = b_val * p[j] if (b_val > 0 and j in PPL_set) else 0
+                            model.addConstr(
+                                arrivals + basing_term >= departures,
+                                name=f"VehicleConservation_w{w}_k{k}_j{j}",
+                            )
 
-        for w in Omega:
+            # (17) Fleet Size — REMOVED. The original constraint capped total
+            # vehicle-arc-traversals at F_k, which prevented multi-leg routing:
+            # a vehicle flying A->B->C consumed 2 of the F_k budget, limiting
+            # 12 C-17s to 12 total legs rather than 12 vehicles each flying
+            # multiple legs. Vehicle conservation (16) already prevents using
+            # more vehicles than are based+arrived, and the distance budget (19)
+            # already caps total fleet-wide travel. Together they bound vehicle
+            # usage without artificially restricting multi-leg operations.
+
+            # (18) Vehicle-Capacity-Constrained Flow, per resource (option A):
+            # independent per-resource capacity — a vehicle could be credited with
+            # a full food load and full water load simultaneously (known simplification)
+            for w in Omega:
+                for m in modes:
+                    for (i, j) in modal_arcs[m]:
+                        for r in R:
+                            model.addConstr(
+                                x[w, m, i, j, r] <= gp.quicksum(
+                                    vehicle_types[k]["capacity"][r] * n[w, k, m, i, j]
+                                    for k in K_m.get(m, [])
+                                ),
+                                name=f"VehicleCapFlow_w{w}_m{m}_i{i}_j{j}_r{r}",
+                            )
+
+            # (19) Fleet-Wide Distance Budget with p_j-coupled turnaround:
+            # Turnaround charged at ALL nodes; exemption at base nodes only when
+            # the site is selected (b_{k,j}*p_j > 0). The product outbound*p_j
+            # is linearized via auxiliary variable g (McCormick, exact for binary p).
+            base_nodes_by_k: Dict[str, List[int]] = {}
+            for k_name, vtype in vehicle_types.items():
+                b_kj = vtype["b_kj"]
+                base_nodes_by_k[k_name] = [
+                    j for j in N if b_kj.get(j, 0) > 0 and j in PPL_set
+                ]
+
+            g_keys = [
+                (w, k_name, j)
+                for k_name in vehicle_types
+                for w in Omega
+                for j in base_nodes_by_k[k_name]
+            ]
+            g = model.addVars(g_keys, lb=0.0, vtype=GRB.CONTINUOUS, name="g_turn") if g_keys else {}
+
             for k_name, vtype in vehicle_types.items():
                 m_veh = vtype["mode"]
                 F_k = vtype["fleet_size"]
-                D_k = vtype["D_k"]
-                pi_k = vtype["pi_k"]
+                for w in Omega:
+                    for j in base_nodes_by_k[k_name]:
+                        outbound_j = gp.quicksum(
+                            n[w, k_name, m_veh, j, j_dst]
+                            for (_, j_dst) in modal_outgoing[m_veh][j]
+                        )
+                        model.addConstr(
+                            g[w, k_name, j] <= F_k * p[j],
+                            name=f"TurnExemptUB1_w{w}_k{k_name}_j{j}",
+                        )
+                        model.addConstr(
+                            g[w, k_name, j] <= outbound_j,
+                            name=f"TurnExemptUB2_w{w}_k{k_name}_j{j}",
+                        )
+                        model.addConstr(
+                            g[w, k_name, j] >= outbound_j - F_k * (1 - p[j]),
+                            name=f"TurnExemptLB_w{w}_k{k_name}_j{j}",
+                        )
 
-                dist_term = gp.quicksum(
-                    modal_arc_distance.get(m_veh, {}).get((i, j), 0.0)
-                    * n[w, k_name, m_veh, i, j]
-                    for (i, j) in modal_arcs[m_veh]
-                )
+            for w in Omega:
+                for k_name, vtype in vehicle_types.items():
+                    m_veh = vtype["mode"]
+                    F_k = vtype["fleet_size"]
+                    D_k = vtype["D_k"]
+                    pi_k = vtype["pi_k"]
 
-                total_outbound = gp.quicksum(
-                    n[w, k_name, m_veh, j, j_dst]
-                    for j in N
-                    for (_, j_dst) in modal_outgoing[m_veh][j]
-                )
+                    dist_term = gp.quicksum(
+                        modal_arc_distance.get(m_veh, {}).get((i, j), 0.0)
+                        * n[w, k_name, m_veh, i, j]
+                        for (i, j) in modal_arcs[m_veh]
+                    )
 
-                exempted = gp.quicksum(
-                    g[w, k_name, j] for j in base_nodes_by_k[k_name]
-                ) if base_nodes_by_k[k_name] else 0
+                    total_outbound = gp.quicksum(
+                        n[w, k_name, m_veh, j, j_dst]
+                        for j in N
+                        for (_, j_dst) in modal_outgoing[m_veh][j]
+                    )
 
-                model.addConstr(
-                    dist_term + pi_k * (total_outbound - exempted) <= F_k * D_k,
-                    name=f"DistanceBudget_w{w}_k{k_name}",
-                )
+                    exempted = gp.quicksum(
+                        g[w, k_name, j] for j in base_nodes_by_k[k_name]
+                    ) if base_nodes_by_k[k_name] else 0
+
+                    model.addConstr(
+                        dist_term + pi_k * (total_outbound - exempted) <= F_k * D_k,
+                        name=f"DistanceBudget_w{w}_k{k_name}",
+                    )
+    elif vehicle_formulation == "individual":
+        raise NotImplementedError("individual vehicle formulation not yet implemented")
+    else:
+        raise ValueError(f"unknown vehicle_formulation: {vehicle_formulation!r}")
 
     # --- Scenario loss definition (updated for modal arc cost + transfer cost) ---
     # Two-tier vehicle epsilon (both are flat per-vehicle-arc costs):

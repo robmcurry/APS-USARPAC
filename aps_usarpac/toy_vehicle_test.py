@@ -408,6 +408,7 @@ def main():
     print("\nSolving...")
     results = solve_stochastic_cvar(
         instance, time_limit=120, mip_gap=load_parameters()["mip_gap"], verbose=True,
+        vehicle_formulation=load_parameters().get("vehicle_formulation", "aggregate"),
     )
 
     print_solution_summary(results, max_flows=10)

@@ -339,6 +339,18 @@ time_bins:
 # bin_3 = 96 hour to two week sustainment phase (placeholder - pending sme calibration)
 active_bin: bin_1
 
+# vehicle formulation switch, read by model/model.py's solve_stochastic_cvar()
+# (as an explicit vehicle_formulation kwarg -- callers thread this value
+# through from load_parameters()["vehicle_formulation"]; it is not read from
+# the instance dict). Two options:
+#   "aggregate"  = current n^omega_{k,m,ij} integer-count formulation
+#                  (default, unchanged) -- vehicles are tracked as integer
+#                  counts per mode-arc per scenario, not individually indexed.
+#   "individual" = per-vehicle-instance binary formulation, in development
+#                  on the individual-vehicle-indexing branch. Not yet
+#                  implemented -- raises NotImplementedError if selected.
+vehicle_formulation: "aggregate"
+
 # vehicle heterogeneity parameters
 # each vehicle type has a mode, fleet size, basing rating threshold,
 # speed, turnaround time, payload, and per-commodity capacity in person-days

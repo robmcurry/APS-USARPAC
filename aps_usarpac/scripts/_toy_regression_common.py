@@ -6,11 +6,11 @@ regression baseline on the toy_vehicle_test instance (4 nodes, 5 scenarios,
 beta=0.9). Used by capture_baseline_aggregate_toy.py and
 check_aggregate_regression.py.
 
-NOTE: solve_stochastic_cvar() has no vehicle_formulation parameter as of
-this writing -- "aggregate" (n^omega_{k,m,ij} vehicle-count variables) is
-the only formulation model.py implements, so no such kwarg is passed here.
-That parameter is expected to be introduced by the individual-vehicle-
-indexing branch this baseline exists to protect against regressing.
+NOTE: solve_stochastic_cvar() now accepts a vehicle_formulation kwarg
+(added on the individual-vehicle-indexing branch); every call here passes
+"aggregate" explicitly so this check always exercises the same formulation
+the locked baseline (output/baseline_aggregate_toy.json) was captured
+against, regardless of the kwarg's default.
 """
 import os
 import sys
@@ -32,6 +32,7 @@ def run_toy_solve():
     params = load_parameters()
     results = solve_stochastic_cvar(
         instance, time_limit=TIME_LIMIT, mip_gap=params["mip_gap"], verbose=False,
+        vehicle_formulation="aggregate",
     )
     model = results["model"]
     solve_info = {
@@ -49,7 +50,9 @@ def run_toy_solve():
 def run_toy_problem_size():
     """Build (never solve) the toy instance to get ground-truth var/constraint counts."""
     instance = build_toy_instance()
-    build = solve_stochastic_cvar(instance, build_only=True, verbose=False)
+    build = solve_stochastic_cvar(
+        instance, build_only=True, verbose=False, vehicle_formulation="aggregate",
+    )
     model = build["model"]
     v = build["variables"]
 
