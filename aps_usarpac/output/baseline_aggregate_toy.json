@@ -1,0 +1,56 @@
+{
+  "generated": "2026-07-13",
+  "note": "Locked regression baseline for the aggregate vehicle formulation (model.py on main, captured before individual-vehicle-indexing work begins). solve_stochastic_cvar() has no vehicle_formulation parameter as of this capture -- 'aggregate' (n^omega_{k,m,ij} vehicle-count variables) is the only formulation implemented, so no such kwarg is passed. Instance: toy_vehicle_test.build_toy_instance() (4 nodes, 5 scenarios, beta=0.9, time_limit=120s).",
+  "instance": "toy_vehicle_test.build_toy_instance",
+  "beta": 0.9,
+  "vehicle_formulation": "aggregate (implicit -- no kwarg exists yet on main)",
+  "solve": {
+    "objective_value": 744055760.9200002,
+    "selected_sites": [
+      1,
+      2
+    ],
+    "mip_gap": 0.00031441459534829286,
+    "status_code": 2,
+    "status": "OPTIMAL",
+    "solve_time_sec": 0.02550506591796875
+  },
+  "problem_size": {
+    "variables": {
+      "p": 3,
+      "x": 80,
+      "z": 40,
+      "release": 40,
+      "tau": 0,
+      "n": 65,
+      "eta": 1,
+      "xi": 5,
+      "loss": 5,
+      "g_turn": 35
+    },
+    "variables_total": 274,
+    "num_vars_gurobi": 274,
+    "constraints": {
+      "SiteBudget": 1,
+      "SelectionBudget": 1,
+      "InventoryReleaseBound": 30,
+      "NonPPLReleaseZero": 10,
+      "FlowBalance_PPL": 30,
+      "FlowBalance_nonPPL": 10,
+      "ModalOutboundFeasibility": 120,
+      "ArcCapacity": 80,
+      "TransferBacking": 0,
+      "TransferCapacity": 0,
+      "VehicleConservation": 80,
+      "VehicleCapFlow": 80,
+      "TurnExemptUB1": 35,
+      "TurnExemptUB2": 35,
+      "TurnExemptLB": 35,
+      "DistanceBudget": 20,
+      "LossDefinition": 5,
+      "CVaRExcess": 5
+    },
+    "constraints_total": 577,
+    "num_constrs_gurobi": 577
+  }
+}

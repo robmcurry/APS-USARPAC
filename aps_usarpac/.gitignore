@@ -9,4 +9,7 @@ __pycache__/
 .claude/settings.local.json
 
 # Generated results, reports, logs, and figures
-output/
+output/*
+# Exception: locked regression baseline, tracked deliberately (see
+# scripts/capture_baseline_aggregate_toy.py / scripts/check_aggregate_regression.py)
+!output/baseline_aggregate_toy.json
