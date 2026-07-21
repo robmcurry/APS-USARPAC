@@ -35,6 +35,106 @@ import gurobipy as gp
 from gurobipy import GRB
 
 
+def _build_subtour_callback(
+    n_ind: Dict,
+    home_by_k: Dict[str, Dict[int, int]],
+    air_indiv_types: List[str],
+    Omega: List[int],
+    air_arcs: List[Tuple[int, int]],
+    stats: Dict[str, int],
+):
+    """
+    Build a Gurobi lazy-constraint callback enforcing subtour elimination for
+    the "individual" vehicle_formulation's per-vehicle-instance binaries
+    (n_ind), replacing the static DepartureSingleNode/DepartureNodeLink
+    constraints (5).
+
+    On every integer-feasible incumbent (MIPSOL), for each (scenario w,
+    air-individual type k, vehicle instance l): computes which nodes are
+    reachable from l's home node by following its selected (value > 0.5)
+    n_ind arcs, then groups any leftover selected arcs (touching nodes never
+    reached from home) into weakly-connected components. Each such component
+    S is a genuine disconnected subtour -- a self-sustaining loop the MIP got
+    "for free" without consuming a home-departure credit (see
+    toy_individual_cyclic_test.py, which found and confirmed this failure
+    mode with constraint 5 removed and no callback in place). For each S,
+    adds the direct subtour-elimination cut:
+        sum_{a in S, b in S, (a,b) in air_arcs} n_ind[w,k,l,"air",a,b] <= |S| - 1
+    which forbids exactly that disconnected arc set (and any other full
+    closure within S) without touching legitimate home-reachable arcs.
+
+    stats: mutable dict, updated in place with "invocations" (MIPSOL calls
+    seen) and "cuts_added" (total lazy constraints emitted) so the caller can
+    report them after model.optimize() returns.
+    """
+    air_arc_set = set(air_arcs)
+
+    # Precompute once: (w, k, l) -> [(i, j), ...] over all air arcs. n_ind is
+    # fully dense over (w, k in air_indiv_types, l, "air", i, j) for (i, j)
+    # in air_arcs, so this just re-groups the existing dict's keys.
+    group_arcs: Dict[Tuple[int, str, int], List[Tuple[int, int]]] = {}
+    for (w, k, l, _m, i, j) in n_ind:
+        group_arcs.setdefault((w, k, l), []).append((i, j))
+
+    def callback(model, where):
+        if where != GRB.Callback.MIPSOL:
+            return
+        stats["invocations"] += 1
+
+        all_keys = list(n_ind.keys())
+        all_vals = model.cbGetSolution([n_ind[key] for key in all_keys])
+        val_map = dict(zip(all_keys, all_vals))
+
+        for (w, k, l), arcs in group_arcs.items():
+            selected = [
+                (i, j) for (i, j) in arcs
+                if val_map[(w, k, l, "air", i, j)] > 0.5
+            ]
+            if not selected:
+                continue
+
+            home = home_by_k[k][l]
+            reached = {home}
+            changed = True
+            while changed:
+                changed = False
+                for (i, j) in selected:
+                    if i in reached and j not in reached:
+                        reached.add(j)
+                        changed = True
+
+            touched = {node for arc in selected for node in arc}
+            phantom_nodes = touched - reached
+            if not phantom_nodes:
+                continue
+
+            remaining = set(phantom_nodes)
+            while remaining:
+                seed = next(iter(remaining))
+                component = {seed}
+                stack = [seed]
+                while stack:
+                    node = stack.pop()
+                    for (i, j) in selected:
+                        if i == node and j in remaining and j not in component:
+                            component.add(j)
+                            stack.append(j)
+                        elif j == node and i in remaining and i not in component:
+                            component.add(i)
+                            stack.append(i)
+                remaining -= component
+                if len(component) < 2:
+                    continue
+                lhs = gp.quicksum(
+                    n_ind[w, k, l, "air", a, b]
+                    for a in component for b in component
+                    if (a, b) in air_arc_set
+                )
+                model.cbLazy(lhs <= len(component) - 1)
+                stats["cuts_added"] += 1
+
+    return callback
+
 
 def solve_stochastic_cvar(
     instance: Dict[str, Any],
@@ -44,6 +144,9 @@ def solve_stochastic_cvar(
     detailed_extraction: bool = False,
     build_only: bool = False,
     vehicle_formulation: str = "aggregate",
+    _debug_skip_departure_single_node: bool = True,
+    _debug_skip_symmetry_break: bool = False,
+    _debug_mip_focus: int = 1,
 ) -> Dict[str, Any]:
     """
     Solve the extensive-form CVaR stochastic prepositioning model.
@@ -63,11 +166,40 @@ def solve_stochastic_cvar(
             only -- no solution fields. For problem-size inspection
             (analysis/problem_size_certificate.py) without paying for a solve.
         vehicle_formulation: "aggregate" (default) uses the existing
-            n^omega_{k,m,ij} integer-vehicle-count formulation, unchanged.
-            "individual" selects the per-vehicle-instance binary formulation
-            under development on the individual-vehicle-indexing branch --
-            not yet implemented, raises NotImplementedError. Callers that
-            don't pass this at all get "aggregate", i.e. current behavior.
+            n^omega_{k,m,ij} integer-vehicle-count formulation, unchanged,
+            for every mode. "individual" uses per-vehicle-instance binaries
+            n^omega_{k,l,m,ij} for air-mode k in {C-17, C-130J} only; sea,
+            land, and any other air type still use the aggregate n
+            unconditionally. Callers that don't pass this at all get
+            "aggregate", i.e. current behavior.
+        _debug_skip_departure_single_node: When True (default) and
+            vehicle_formulation="individual", the static DepartureSingleNode/
+            DepartureNodeLink constraints (5) are NOT built. Subtour
+            elimination is instead enforced by a Gurobi lazy-constraint
+            callback (see _build_subtour_callback below), which detects
+            disconnected (non-home-reachable) arc components on each
+            integer-feasible incumbent and cuts them directly -- validated on
+            the toy cyclic network (toy_individual_cyclic_test.py's added
+            2<->3 non-home cycle): with no mitigation the optimizer selects 3
+            phantom/disconnected instances; with this callback active, an
+            independent post-solve reachability check confirms 0 phantom
+            instances remain (1 lazy cut sufficed, over 3 MIPSOL callback
+            invocations). Pass False to fall back to the static constraint
+            (DIAGNOSTIC/comparison use only; does not disable the callback --
+            the two mechanisms are independent and either alone suffices).
+            Does not touch VehicleConservationIndiv (3), which is the sole
+            carrier of the p_j/home-node linkage.
+        _debug_skip_symmetry_break: DIAGNOSTIC ONLY. When True and
+            vehicle_formulation="individual", skips the VehicleSymmetryBreak
+            constraints (scalar ordering of interchangeable same-home-node
+            vehicle instances). Default False (constraints active). Exists
+            to reproduce the pre-symmetry-break baseline for isolated A/B
+            comparison against later runs that added this constraint family.
+        _debug_mip_focus: DIAGNOSTIC ONLY. Value passed to Gurobi's
+            Params.MIPFocus when vehicle_formulation="individual". Default 1
+            (prioritize finding feasible incumbents). Pass 0 to restore
+            Gurobi's own default (balanced) focus, to reproduce the
+            baseline behavior from before MIPFocus tuning was introduced.
 
     Returns:
         results dictionary with selected sites, objective value, and solution details
@@ -202,6 +334,14 @@ def solve_stochastic_cvar(
         name="release",
     )
 
+    # n_ind/dep_node/g_ind: individual-formulation-only variable families
+    # (air-mode only). Defaulted here, before either branch runs, so they're
+    # always defined even under vehicle_formulation="aggregate" or
+    # has_vehicles=False -- the "individual" branches below overwrite them.
+    n_ind: Dict = {}
+    dep_node: Dict = {}
+    g_ind: Dict = {}
+
     # n[w,k,m,i,j] - integer vehicle count: number of type-k vehicles of mode m
     # traversing arc (i,j) in scenario w; only defined for k in K_m[m]
     if vehicle_formulation == "aggregate":
@@ -217,7 +357,35 @@ def solve_stochastic_cvar(
         else:
             n = {}
     elif vehicle_formulation == "individual":
-        raise NotImplementedError("individual vehicle formulation not yet implemented")
+        # Individual-vehicle indexing is scoped to air mode only (C-17,
+        # C-130J) -- sea and land keep the same aggregate n unconditionally.
+        # n itself is built exactly as in the aggregate branch (same keys,
+        # all modes) so constraint (18) below can reference it unmodified;
+        # for air-individual types its value is pinned by the new
+        # VehicleAggregation equality constraint further down, not
+        # optimized directly.
+        if has_vehicles:
+            n_keys = [
+                (w, k, m, i, j)
+                for w in Omega
+                for m in modes
+                for k in K_m.get(m, [])
+                for (i, j) in modal_arcs[m]
+            ]
+            n = model.addVars(n_keys, lb=0, vtype=GRB.INTEGER, name="n")
+
+            air_indiv_types = [k for k in K_m.get("air", []) if k in ("C-17", "C-130J")]
+            n_ind_keys = [
+                (w, k, l, "air", i, j)
+                for k in air_indiv_types
+                for w in Omega
+                for l in range(1, vehicle_types[k]["fleet_size"] + 1)
+                for (i, j) in modal_arcs["air"]
+            ]
+            n_ind = model.addVars(n_ind_keys, vtype=GRB.BINARY, name="n_ind") if n_ind_keys else {}
+        else:
+            n = {}
+            n_ind = {}
     else:
         raise ValueError(f"unknown vehicle_formulation: {vehicle_formulation!r}")
 
@@ -494,9 +662,341 @@ def solve_stochastic_cvar(
                         name=f"DistanceBudget_w{w}_k{k_name}",
                     )
     elif vehicle_formulation == "individual":
-        raise NotImplementedError("individual vehicle formulation not yet implemented")
+        # Individual-vehicle indexing (air mode only: C-17, C-130J). Sea and
+        # land -- and any other air-mode type not in this pair -- keep the
+        # exact aggregate (16)/(18)/(19) logic from the branch above,
+        # duplicated here unchanged (not shared) because this branch fully
+        # replaces, rather than supplements, the has_vehicles constraint set.
+        if has_vehicles:
+            air_indiv_types = [k for k in K_m.get("air", []) if k in ("C-17", "C-130J")]
+            non_indiv_air_types = [k for k in K_m.get("air", []) if k not in air_indiv_types]
+
+            # --- (16) Vehicle Conservation -- sea/land/non-individual-air,
+            # UNCHANGED aggregate logic, restricted to those modes/types ---
+            for w in Omega:
+                for m in modes:
+                    k_list = non_indiv_air_types if m == "air" else K_m.get(m, [])
+                    for k in k_list:
+                        b_kj = vehicle_types[k]["b_kj"]
+                        for j in N:
+                            arrivals = gp.quicksum(
+                                n[w, k, m, i_src, j]
+                                for (i_src, _) in modal_incoming[m][j]
+                            )
+                            departures = gp.quicksum(
+                                n[w, k, m, j, j_dst]
+                                for (_, j_dst) in modal_outgoing[m][j]
+                            )
+                            b_val = b_kj.get(j, 0)
+                            basing_term = b_val * p[j] if (b_val > 0 and j in PPL_set) else 0
+                            model.addConstr(
+                                arrivals + basing_term >= departures,
+                                name=f"VehicleConservation_w{w}_k{k}_j{j}",
+                            )
+
+            # --- VehicleAggregation (new, no aggregate analog): pins the
+            # aggregate n^omega_{k,air,ij} for each individually-indexed air
+            # type to the sum of its per-vehicle-instance binaries, so (18)
+            # below needs no modification. ---
+            for w in Omega:
+                for k in air_indiv_types:
+                    F_k = vehicle_types[k]["fleet_size"]
+                    for (i, j) in modal_arcs["air"]:
+                        model.addConstr(
+                            n[w, k, "air", i, j] == gp.quicksum(
+                                n_ind[w, k, l, "air", i, j] for l in range(1, F_k + 1)
+                            ),
+                            name=f"VehicleAggregation_w{w}_k{k}_i{i}_j{j}",
+                        )
+
+            # --- (16-individual) Vehicle Conservation per vehicle instance l:
+            # l may only depart node j if it is based there (home_j == j,
+            # gated by p[home_j]) or arrived there via n_ind on a prior leg
+            # in the same scenario. Scenario-local: l has no identity across
+            # scenarios w, so this is per-w like the aggregate version. ---
+            home_by_k: Dict[str, Dict[int, int]] = {
+                k: _assign_individual_homes(vehicle_types[k]["b_kj"], vehicle_types[k]["fleet_size"])
+                for k in air_indiv_types
+            }
+
+            for w in Omega:
+                for k in air_indiv_types:
+                    homes = home_by_k[k]
+                    for l in range(1, vehicle_types[k]["fleet_size"] + 1):
+                        home_j = homes[l]
+                        for j in N:
+                            arrivals_l = gp.quicksum(
+                                n_ind[w, k, l, "air", i_src, j]
+                                for (i_src, _) in modal_incoming["air"][j]
+                            )
+                            departures_l = gp.quicksum(
+                                n_ind[w, k, l, "air", j, j_dst]
+                                for (_, j_dst) in modal_outgoing["air"][j]
+                            )
+                            home_term = p[j] if (j == home_j and j in PPL_set) else 0
+                            model.addConstr(
+                                arrivals_l + home_term >= departures_l,
+                                name=f"VehicleConservationIndiv_w{w}_k{k}_l{l}_j{j}",
+                            )
+
+            # --- (18) Vehicle-Capacity-Constrained Flow -- UNCHANGED, byte-
+            # identical to the aggregate branch's code. n[w,k,m,i,j] is valid
+            # for every k here regardless of formulation: sea/land/non-
+            # individual-air are optimized directly, air-individual types are
+            # pinned by VehicleAggregation above. No modification required. ---
+            for w in Omega:
+                for m in modes:
+                    for (i, j) in modal_arcs[m]:
+                        for r in R:
+                            model.addConstr(
+                                x[w, m, i, j, r] <= gp.quicksum(
+                                    vehicle_types[k]["capacity"][r] * n[w, k, m, i, j]
+                                    for k in K_m.get(m, [])
+                                ),
+                                name=f"VehicleCapFlow_w{w}_m{m}_i{i}_j{j}_r{r}",
+                            )
+
+            # --- (19) Fleet-Wide Distance Budget -- sea/land/non-individual-
+            # air, UNCHANGED aggregate logic (F_k*D_k, McCormick g), just
+            # skipping air_indiv_types (handled by the per-l version below). ---
+            base_nodes_by_k: Dict[str, List[int]] = {}
+            for k_name, vtype in vehicle_types.items():
+                if k_name in air_indiv_types:
+                    continue
+                b_kj = vtype["b_kj"]
+                base_nodes_by_k[k_name] = [
+                    j for j in N if b_kj.get(j, 0) > 0 and j in PPL_set
+                ]
+
+            g_keys = [
+                (w, k_name, j)
+                for k_name in vehicle_types
+                if k_name not in air_indiv_types
+                for w in Omega
+                for j in base_nodes_by_k[k_name]
+            ]
+            g = model.addVars(g_keys, lb=0.0, vtype=GRB.CONTINUOUS, name="g_turn") if g_keys else {}
+
+            for k_name, vtype in vehicle_types.items():
+                if k_name in air_indiv_types:
+                    continue
+                m_veh = vtype["mode"]
+                F_k = vtype["fleet_size"]
+                for w in Omega:
+                    for j in base_nodes_by_k[k_name]:
+                        outbound_j = gp.quicksum(
+                            n[w, k_name, m_veh, j, j_dst]
+                            for (_, j_dst) in modal_outgoing[m_veh][j]
+                        )
+                        model.addConstr(
+                            g[w, k_name, j] <= F_k * p[j],
+                            name=f"TurnExemptUB1_w{w}_k{k_name}_j{j}",
+                        )
+                        model.addConstr(
+                            g[w, k_name, j] <= outbound_j,
+                            name=f"TurnExemptUB2_w{w}_k{k_name}_j{j}",
+                        )
+                        model.addConstr(
+                            g[w, k_name, j] >= outbound_j - F_k * (1 - p[j]),
+                            name=f"TurnExemptLB_w{w}_k{k_name}_j{j}",
+                        )
+
+            for w in Omega:
+                for k_name, vtype in vehicle_types.items():
+                    if k_name in air_indiv_types:
+                        continue
+                    m_veh = vtype["mode"]
+                    F_k = vtype["fleet_size"]
+                    D_k = vtype["D_k"]
+                    pi_k = vtype["pi_k"]
+
+                    dist_term = gp.quicksum(
+                        modal_arc_distance.get(m_veh, {}).get((i, j), 0.0)
+                        * n[w, k_name, m_veh, i, j]
+                        for (i, j) in modal_arcs[m_veh]
+                    )
+
+                    total_outbound = gp.quicksum(
+                        n[w, k_name, m_veh, j, j_dst]
+                        for j in N
+                        for (_, j_dst) in modal_outgoing[m_veh][j]
+                    )
+
+                    exempted = gp.quicksum(
+                        g[w, k_name, j] for j in base_nodes_by_k[k_name]
+                    ) if base_nodes_by_k[k_name] else 0
+
+                    model.addConstr(
+                        dist_term + pi_k * (total_outbound - exempted) <= F_k * D_k,
+                        name=f"DistanceBudget_w{w}_k{k_name}",
+                    )
+
+            # --- (19-individual) Fleet-Wide Distance Budget per vehicle
+            # instance l: own D_k budget (not F_k*D_k, since F_k=1 for a
+            # single instance). Turnaround exemption re-derived at the
+            # individual level: g_ind McCormick-linearizes outbound_home_j *
+            # p[home_j], with the constant upper bound replaced by 1 (a
+            # single vehicle instance) instead of F_k. Since home_j is a
+            # FIXED, precomputed node per l (not a decision variable), only
+            # one candidate base node exists per l -- the McCormick trick
+            # transfers directly (same UB1/UB2/LB structure, F_k -> 1,
+            # base_nodes_by_k -> {home_j}); no new derivation was needed. ---
+            g_ind_keys = [
+                (w, k, l)
+                for k in air_indiv_types
+                for w in Omega
+                for l in range(1, vehicle_types[k]["fleet_size"] + 1)
+                if home_by_k[k][l] in PPL_set
+            ]
+            g_ind = model.addVars(g_ind_keys, lb=0.0, vtype=GRB.CONTINUOUS, name="g_turn_indiv") if g_ind_keys else {}
+
+            for k in air_indiv_types:
+                vtype = vehicle_types[k]
+                D_k = vtype["D_k"]
+                pi_k = vtype["pi_k"]
+                homes = home_by_k[k]
+                for w in Omega:
+                    for l in range(1, vtype["fleet_size"] + 1):
+                        home_j = homes[l]
+                        if home_j in PPL_set:
+                            outbound_home = gp.quicksum(
+                                n_ind[w, k, l, "air", home_j, j_dst]
+                                for (_, j_dst) in modal_outgoing["air"][home_j]
+                            )
+                            model.addConstr(
+                                g_ind[w, k, l] <= p[home_j],
+                                name=f"TurnExemptIndivUB1_w{w}_k{k}_l{l}",
+                            )
+                            model.addConstr(
+                                g_ind[w, k, l] <= outbound_home,
+                                name=f"TurnExemptIndivUB2_w{w}_k{k}_l{l}",
+                            )
+                            model.addConstr(
+                                g_ind[w, k, l] >= outbound_home - (1 - p[home_j]),
+                                name=f"TurnExemptIndivLB_w{w}_k{k}_l{l}",
+                            )
+                            exempted_l = g_ind[w, k, l]
+                        else:
+                            exempted_l = 0
+
+                        dist_term_l = gp.quicksum(
+                            modal_arc_distance.get("air", {}).get((i, j), 0.0)
+                            * n_ind[w, k, l, "air", i, j]
+                            for (i, j) in modal_arcs["air"]
+                        )
+                        total_outbound_l = gp.quicksum(
+                            n_ind[w, k, l, "air", j, j_dst]
+                            for j in N
+                            for (_, j_dst) in modal_outgoing["air"][j]
+                        )
+                        model.addConstr(
+                            dist_term_l + pi_k * (total_outbound_l - exempted_l) <= D_k,
+                            name=f"DistanceBudgetIndiv_w{w}_k{k}_l{l}",
+                        )
+
+            # --- VehicleSymmetryBreak (new, no aggregate analog): breaks
+            # permutation symmetry among individually-indexed vehicle
+            # instances that share both type k and home node -- they are
+            # fully interchangeable (same D_k, pi_k, capacity, home node),
+            # differing only by the arbitrary l label _assign_individual_homes
+            # gave them. Scoped STRICTLY within (k, home_j) groups: instances
+            # at different home nodes are already structurally distinguishable
+            # and must never be constrained against each other, or the cut
+            # could exclude every optimum. Orders instances by a cheap scalar
+            # summary (total outbound air-arc count in scenario w) rather than
+            # a full lexicographic ordering on the arc-incidence vector:
+            #   total_outbound[w,k,l] <= total_outbound[w,k,l+1]
+            # for consecutive l within a home group. Always valid -- for any
+            # feasible/optimal solution, relabeling within an interchangeable
+            # group to satisfy non-decreasing order changes nothing else, so
+            # at least one optimum survives the cut. Weaker than full
+            # lexicographic ordering (ties leave residual symmetry) but far
+            # cheaper: one constraint per adjacent pair per scenario.
+            for k in (air_indiv_types if not _debug_skip_symmetry_break else []):
+                homes = home_by_k[k]
+                group_by_home: Dict[int, List[int]] = {}
+                for l, home_j in homes.items():
+                    group_by_home.setdefault(home_j, []).append(l)
+                for home_j, l_list in group_by_home.items():
+                    if len(l_list) < 2:
+                        continue
+                    l_list = sorted(l_list)
+                    for w in Omega:
+                        outbound_by_l = {
+                            l: gp.quicksum(
+                                n_ind[w, k, l, "air", j, j_dst]
+                                for j in N
+                                for (_, j_dst) in modal_outgoing["air"][j]
+                            )
+                            for l in l_list
+                        }
+                        for idx in range(len(l_list) - 1):
+                            l_a, l_b = l_list[idx], l_list[idx + 1]
+                            model.addConstr(
+                                outbound_by_l[l_a] <= outbound_by_l[l_b],
+                                name=f"VehicleSymmetryBreak_w{w}_k{k}_home{home_j}_l{l_a}_l{l_b}",
+                            )
+
+            # --- DepartureSingleNode (new, no aggregate analog): each
+            # vehicle instance l may have positive outbound arcs from at most
+            # one node per scenario, preventing the MIP from asserting the
+            # same physical vehicle simultaneously departing two different
+            # origin nodes. dep_node[w,k,l,j] indicates l has >=1 outbound
+            # arc from j; capped to at most one j per (w,k,l). Carries no
+            # p_j/home-node information -- that linkage lives entirely in
+            # VehicleConservationIndiv above, via home_term. Skippable via
+            # _debug_skip_departure_single_node for isolating its effect
+            # (e.g. testing for double-booking with it removed). ---
+            if not _debug_skip_departure_single_node:
+                dep_node_keys = [
+                    (w, k, l, j)
+                    for k in air_indiv_types
+                    for w in Omega
+                    for l in range(1, vehicle_types[k]["fleet_size"] + 1)
+                    for j in N
+                    if modal_outgoing["air"][j]
+                ]
+                dep_node = model.addVars(dep_node_keys, vtype=GRB.BINARY, name="dep_node") if dep_node_keys else {}
+
+                for k in air_indiv_types:
+                    for w in Omega:
+                        for l in range(1, vehicle_types[k]["fleet_size"] + 1):
+                            for j in N:
+                                if not modal_outgoing["air"][j]:
+                                    continue
+                                for (_, j_dst) in modal_outgoing["air"][j]:
+                                    model.addConstr(
+                                        n_ind[w, k, l, "air", j, j_dst] <= dep_node[w, k, l, j],
+                                        name=f"DepartureNodeLink_w{w}_k{k}_l{l}_j{j}_jd{j_dst}",
+                                    )
+                            model.addConstr(
+                                gp.quicksum(
+                                    dep_node[w, k, l, j] for j in N if modal_outgoing["air"][j]
+                                ) <= 1,
+                                name=f"DepartureSingleNode_w{w}_k{k}_l{l}",
+                            )
     else:
         raise ValueError(f"unknown vehicle_formulation: {vehicle_formulation!r}")
+
+    # --- Lazy subtour-elimination callback (individual formulation only) ---
+    # n_ind is only non-empty when vehicle_formulation="individual" AND
+    # has_vehicles AND air_indiv_types is non-empty -- which also implies
+    # home_by_k/air_indiv_types were populated by the branch above, so it's
+    # safe to reference them here.
+    subtour_stats = {"invocations": 0, "cuts_added": 0}
+    subtour_callback = None
+    if vehicle_formulation == "individual" and n_ind:
+        model.Params.LazyConstraints = 1
+        # MIPFocus=1: prioritize finding feasible incumbents over proving
+        # optimality. Root-scale diagnostics (F_k=12/16 on the real 50-node
+        # network) never leave node 0 in 45 minutes under the default focus
+        # (SolCount=0 throughout) -- scoped to the individual formulation
+        # only, since the aggregate branch already converges well under the
+        # default and this must not perturb its locked regression baseline.
+        model.Params.MIPFocus = _debug_mip_focus
+        subtour_callback = _build_subtour_callback(
+            n_ind, home_by_k, air_indiv_types, Omega, modal_arcs["air"], subtour_stats,
+        )
 
     # --- Scenario loss definition (updated for modal arc cost + transfer cost) ---
     # Two-tier vehicle epsilon (both are flat per-vehicle-arc costs):
@@ -550,11 +1050,15 @@ def solve_stochastic_cvar(
                 "p": p, "x": x, "tau": tau, "z": z,
                 "release": release, "eta": eta, "xi": xi, "loss": loss,
                 "n": n, "g": g,
+                "n_ind": n_ind, "dep_node": dep_node, "g_ind": g_ind,
             },
         }
 
     # --- Optimize ---
-    model.optimize()
+    if subtour_callback is not None:
+        model.optimize(subtour_callback)
+    else:
+        model.optimize()
 
     # --- Prepare results ---
     results: Dict[str, Any] = {
@@ -576,10 +1080,12 @@ def solve_stochastic_cvar(
         "safety_stock_fraction": safety_stock_fraction,
         "model": model,
         "vehicle_flows": {},       # keyed by (w, k, m, i, j) -> integer count
+        "vehicle_flows_individual": {},  # keyed by (w, k, l, m, i, j) -> 0/1 (individual formulation, air only)
+        "subtour_callback_stats": subtour_stats,  # {"invocations": int, "cuts_added": int}
         "variables": {
             "p": p, "x": x, "tau": tau, "z": z,
             "release": release, "eta": eta, "xi": xi, "loss": loss,
-            "n": n,
+            "n": n, "n_ind": n_ind,
         },
     }
 
@@ -674,6 +1180,12 @@ def solve_stochastic_cvar(
             for key, val in n_vals.items():
                 if val > 0.5:
                     results["vehicle_flows"][key] = int(round(val))
+
+        if n_ind:
+            n_ind_vals = model.getAttr("X", n_ind)
+            for key, val in n_ind_vals.items():
+                if val > 0.5:
+                    results["vehicle_flows_individual"][key] = int(round(val))
 
         # Aggregate flow totals by mode and total transfer volume
         flow_by_mode: Dict[str, float] = {"sea": 0.0, "air": 0.0, "land": 0.0}
@@ -783,3 +1295,31 @@ def _status_to_string(status_code: int) -> str:
         GRB.INTERRUPTED: "INTERRUPTED",
     }
     return status_map.get(status_code, f"STATUS_{status_code}")
+
+
+def _assign_individual_homes(b_kj: Dict[int, int], fleet_size: int) -> Dict[int, int]:
+    """
+    Deterministically assign each individual vehicle instance l in
+    {1,...,fleet_size} a fixed home/basing node, by splitting the aggregate
+    per-node basing counts b_kj (the same counts the aggregate formulation
+    uses) into per-instance slots. Nodes are visited in sorted order so the
+    assignment is reproducible run to run.
+
+    Raises ValueError if sum(b_kj.values()) != fleet_size -- individual
+    vehicle indexing requires every instance to have exactly one home node
+    (a vehicle with no home could never legally depart under constraint 16).
+    """
+    total = sum(b_kj.values())
+    if total != fleet_size:
+        raise ValueError(
+            f"basing allocation {b_kj} sums to {total}, expected fleet_size="
+            f"{fleet_size} -- individual vehicle indexing requires every "
+            "instance to have a home node"
+        )
+    homes: Dict[int, int] = {}
+    l = 1
+    for node in sorted(b_kj.keys()):
+        for _ in range(b_kj[node]):
+            homes[l] = node
+            l += 1
+    return homes

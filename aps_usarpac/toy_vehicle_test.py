@@ -51,7 +51,13 @@ def _compute_basing(eligible, fleet_size, node_tier):
     return b
 
 
-def build_toy_instance():
+def build_toy_instance(air_fleet_size: int = 4):
+    """
+    air_fleet_size: overrides fleet_size for both C-17 and C-130J (default 4,
+    matching the original hardcoded toy values byte-for-byte). Used to test
+    the "individual" vehicle_formulation at the smallest possible scale
+    (air_fleet_size=1) without touching the sea/land fleet sizes.
+    """
     nodes = [1, 2, 3, 4]
     ppl_nodes = [1, 2, 3]
     commodities = ["food", "water"]
@@ -135,20 +141,20 @@ def build_toy_instance():
     vehicle_types = {
         "C-17": {
             "mode": "air",
-            "fleet_size": 4,
+            "fleet_size": air_fleet_size,
             "capacity": {"food": 143519, "water": 5167},
             "J_k": c17_eligible,
-            "b_kj": _compute_basing(c17_eligible, 4, node_tier),
+            "b_kj": _compute_basing(c17_eligible, air_fleet_size, node_tier),
             "D_k": 3.0 * 11662,
             "pi_k": (2.0 / 24.0) * 11662,
             "cruise_speed_km_day": 11662,
         },
         "C-130J": {
             "mode": "air",
-            "fleet_size": 4,
+            "fleet_size": air_fleet_size,
             "capacity": {"food": 35280, "water": 1270},
             "J_k": [1, 2, 3],
-            "b_kj": _compute_basing([1, 2, 3], 4, node_tier),
+            "b_kj": _compute_basing([1, 2, 3], air_fleet_size, node_tier),
             "D_k": 3.0 * 7840,
             "pi_k": (2.0 / 24.0) * 7840,
             "cruise_speed_km_day": 7840,
