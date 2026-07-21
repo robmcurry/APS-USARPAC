@@ -17,6 +17,8 @@ A working log of implementing per-vehicle-instance indexing for air-mode fleets 
 
 > **⚠ UPDATE (Run 6, added after initial circulation): β=0.5 was independently compounding the difficulty.** All five runs above (and the diagnosis drawn from them) used β=0.5 — a diagnostic override, not the real locked value β=0.90. A sixth run repeating Run 1's exact plain-baseline configuration (no symmetry-break, no MIPFocus) with **only β changed to 0.90** found **2,731 branch-and-bound nodes at depth 108**, versus Run 1's **1 node at depth 0** — in the identical 45-minute budget. See §3.5 below. This does not overturn the size/scale findings (§5), but it means the "intractable" conclusion in §6 was drawn entirely under the hardest tail-weighting tested, and needs qualification: the real production configuration may behave qualitatively differently.
 
+> **⚠ UPDATE #2 (Runs 7–8): the β=0.90 question raised above is now answered, and the answer is negative.** Run 6 was repeated from a fresh terminal (Run 7, §3.6) and reproduced almost exactly (731 lazy cuts and 9 MIPSOL calls in both, node count within 4%), confirming Run 6 wasn't a fluke. It was then extended to the full 3-hour budget (Run 8, §3.7): **13,206 nodes explored, still zero incumbents, best bound moved only ~0.024% across the entire 3 hours.** The node-exploration rate is *not* a clean accelerating curve as Run 6's 45-minute window suggested — the 3-hour run shows a fast initial climb, then a ~52-minute near-stall, then an uneven recovery of bursts and slow stretches. Extending the time budget further is not a productive lever on its own; the reformulation directions in §7 are the more promising path. §6's Finding #1 (weak root relaxation) is now confirmed to hold at the real β=0.90 value, not just β=0.5.
+
 ---
 
 ## 1. Pipeline & what changed
@@ -55,6 +57,13 @@ model.py  solve_stochastic_cvar()
 - **`VehicleSymmetryBreak`** (new constraint family) — for each (type, home node) group with ≥2 interchangeable instances, orders them by total outbound air-arc count: `total_outbound[w,k,l] <= total_outbound[w,k,l+1]`. Provably preserves at least one optimum (any solution can be relabeled within an interchangeable group to satisfy the order).
 - **`MIPFocus=1`** — set only when `vehicle_formulation="individual"`, alongside the existing `LazyConstraints=1`. Does not touch the aggregate branch.
 - All four changes scoped strictly to `vehicle_formulation="individual"`; **aggregate regression: ALL PASS** re-confirmed after every change (objective, sites, gap, and all 19 variable/constraint family counts match the locked `baseline_aggregate_toy.json` baseline exactly, every time).
+
+### Code changes for Runs 7–8 (`model/model.py`)
+
+- **`_debug_node_log_interval_sec`** (new, default `None`) — when set, `_build_subtour_callback`'s returned callback also handles `GRB.Callback.MIP` (Gurobi's periodic B&B polling point, independent of `MIPSOL`) and appends `{elapsed_sec, node_count, best_bound, sol_count}` to `stats["node_log"]` roughly every N seconds, so a long run's node-exploration rate can be inspected over time rather than only at completion. Zero effect when unset.
+- **`_debug_incumbent_flag_path`** (new, default `None`) — when set, writes a one-line marker file the instant a MIPSOL candidate survives its own callback call with zero lazy cuts added (i.e. a genuine accepted incumbent), so an external process can detect the event without waiting for `model.optimize()` to return. **Caught and fixed a bug in the first version of this**, which flagged on the *first MIPSOL invocation seen* rather than the first one that wasn't itself cut — see the Run 8 write-up (§3.7) for how this was caught and corrected mid-investigation.
+- **Graceful `SIGTERM` handling** — when the lazy callback is active, `solve_stochastic_cvar` now installs a `SIGTERM` handler around `model.optimize()` that calls `model.terminate()` instead of letting Python's default handler kill the process outright. Lets an external memory-pressure watchdog (`scripts/memory_watchdog.py`, new) stop a run cleanly and still get usable partial results/status, instead of an uncontrolled kill.
+- All three changes scoped to the individual-formulation lazy-callback path only; **aggregate regression: ALL PASS** and the toy individual smoke test re-confirmed clean after each.
 
 ---
 
@@ -159,6 +168,51 @@ The second half ran at ~2.7× the first half's rate — a real acceleration, not
 
 **Implication:** every finding in §6 (Diagnosis) below was drawn entirely under β=0.5, the hardest tail-weighting tested. Whether the same weak-root-relaxation diagnosis holds at β=0.90 given more time — or whether β=0.90 eventually produces a feasible solution and a usable gap on a similar timescale to the F_k=1 result — is now the open question a longer β=0.90 run (not yet performed) would answer.
 
+### Run 7 — β=0.90 repeat (fresh terminal) · 45-min cap
+
+Run 6 was launched from a PyCharm terminal that was later closed; before extending the time budget, it was relaunched from a fresh terminal session to confirm it reproduces rather than chasing a one-off.
+
+| | Run 6 (original) | Run 7 (repeat) |
+|---|---|---|
+| Status | TIME_LIMIT, SolCount=0 | TIME_LIMIT, SolCount=0 |
+| Nodes explored | 2,731 | 2,846 |
+| Best bound | 5.0278e9 | 5.02777e9 |
+| Lazy cuts | 731 | **731 (identical)** |
+| MIPSOL calls | 9 | **9 (identical)** |
+| Peak RSS | 4,751 MB | 7,027 MB |
+| Wall-clock | 2703.0s | 2703.1s |
+
+Identical lazy-cut and MIPSOL counts, near-identical best bound — a faithful reproduction (node-count variance of ~4% is normal run-to-run noise in Gurobi's parallel B&B thread scheduling, not a different outcome). Peak RSS ran meaningfully higher this time (7.0 vs 4.75 GB) with no other behavioral difference; still far under any safety threshold.
+
+Node-exploration rate, sampled every 5 minutes this time (new instrumentation — `_debug_node_log_interval_sec`): nothing happens for the first ~13 minutes (root cutting planes), then branching starts and continues at a noisy but roughly increasing pace through the 45-minute cap, consistent with Run 6's finding. One instrumentation caveat surfaced here: the 5-minute sampler only fires inside Gurobi's periodic `MIP` callback poll, so a burst of nodes in the final ~90 seconds before the cap (1,756 → 2,846 nodes) wasn't resolved at finer granularity — real, but its exact shape within that window is unknown.
+
+### Run 8 — β=0.90 · 3-hour extension
+
+Motivated directly by Run 6/7's finding that the node rate was still accelerating, not plateauing, at the 45-minute cutoff. Same configuration as Run 7 (F_k=12/16, N=10, seed=32, lazy callback, no symmetry-break, no MIPFocus override, β=0.90), TimeLimit extended to 10,800s (3 hours). Launched as a detached background process (survives terminal closure) with an independent external memory watchdog (`scripts/memory_watchdog.py`) sampling system-wide pressure + process RSS every 15s, empowered to send a graceful `SIGTERM` (routed to `model.terminate()`) if pressure escalated. It never needed to — pressure stayed "normal" for the entire run.
+
+**A methodology note, reported transparently:** partway through this run, a marker file appeared claiming an incumbent had been found at 178s (obj=5.0459e9). Cross-checking the live Gurobi log showed the "Incumbent" column was still `-` (SolCount=0) more than 25 minutes later — impossible if that had been a real accepted incumbent. The bug: the flag-write logic fired on the *first MIPSOL callback invocation seen*, but a MIPSOL candidate that gets cut via `cbLazy` in that same callback call is rejected by Gurobi, not accepted — it never becomes the incumbent. Fixed in `model.py` (flag now only fires when a callback call adds zero cuts) and reconfirmed against the aggregate regression + toy smoke test; the false-positive file from this run was set aside rather than trusted. No genuine incumbent flag fired for the remainder of the run.
+
+**Final result:**
+
+| | Run 6 (45 min) | Run 7 (45 min) | **Run 8 (3 hr)** |
+|---|---|---|---|
+| Status | TIME_LIMIT, SolCount=0 | TIME_LIMIT, SolCount=0 | **TIME_LIMIT, SolCount=0** |
+| Nodes explored | 2,731 | 2,846 | **13,206** |
+| Best bound | 5.0278e9 | 5.02777e9 | **5.02870e9** |
+| Lazy cuts | 731 | 731 | **1,253** |
+| MIPSOL calls | 9 | 9 | **16** |
+| Peak RSS | 4,751 MB | 7,027 MB | **9,461 MB** |
+| Incumbent found | No | No | **No** |
+
+**The node-exploration rate is bursty, not cleanly accelerating** — the "accelerating, not plateauing" read from Run 6/7 held only over the short window those runs covered:
+
+1. **0–12 min:** 0 nodes (root cutting planes).
+2. **12–58 min:** fast acceleration, 0 → 8,770 nodes, peaking around ~500 nodes/min.
+3. **~58–110 min (52 minutes):** a long near-stall — only 8,770 → 9,429 nodes, **~12.7 nodes/min**, a ~40× slowdown from the peak rate. CPU stayed active throughout (this is expensive individual branch nodes, not a hang).
+4. **110–180 min:** uneven recovery — bursts of 60–90 nodes/min alternating with slow stretches of 8–16 nodes/min, ending at 13,206 total nodes.
+
+**What 4× the time budget bought:** 4.8× more nodes explored, but the best bound moved only **~0.024% in total across the full 3 hours** (~0.018% of that beyond the 45-minute mark already captured by Run 6/7). This directly answers the question Run 6 left open (§7, "Extend the β=0.90 test"): extending the time budget further is not a productive lever on its own, at either β value. Finding #1 in §6 (weak root/LP relaxation relative to the true integer hull) is now confirmed to hold at the real β=0.90 configuration, not just the β=0.5 diagnostic runs — see the updated scope note in §6.
+
 ### Note on β=0.5 (Runs 1–5)
 
 All five runs above use β=0.5 (CVaR tail = 5 of 10 scenarios) rather than the locked production value β=0.90 (tail = 1 scenario at N=10), specifically to generate genuine routing pressure across half the instance rather than concentrating all risk-aversion weight on a single scenario. **These results are not comparable to locked β=0.90 baselines** and are a lower bound on what β=0.90 or larger N would show, not a direct estimate. Staged runs at β=0.90 (N=25, N=50 — "Step B/C") were never reached; Step A itself never cleared the review gate.
@@ -210,7 +264,7 @@ First 3-hour attempt was safely self-terminated by an external monitoring wrappe
 
 ## 6. Diagnosis
 
-> **Scope note:** the four findings below are drawn from Runs 1–5, all of which used β=0.5. Run 6 (§3.5) shows β itself is a major independent factor — at β=0.90, node exploration goes from 1 node/depth 0 to 2,731 nodes/depth 108 in the same 45 minutes, with an accelerating (not plateauing) node rate. Finding #1 (weak root relaxation) held equally at both β values — that part looks structural. Findings #2–4 (callback is cheap, weak symmetry-breaking doesn't help, MIPFocus reveals-but-doesn't-break the wall) were only tested at β=0.5 and have not yet been re-examined at β=0.90.
+> **Scope note:** the four findings below are drawn from Runs 1–5, all of which used β=0.5. Run 6 (§3.5) shows β itself is a major independent factor — at β=0.90, node exploration goes from 1 node/depth 0 to 2,731 nodes/depth 108 in the same 45 minutes. Runs 7–8 (§3.6–3.7) extended this to a full 3-hour budget: 13,206 nodes, still zero incumbents, and only ~0.024% total best-bound movement — with the node rate turning out to be bursty (fast climb, ~52-min near-stall, uneven recovery) rather than cleanly accelerating. **Finding #1 (weak root relaxation) is now confirmed to hold at β=0.90 over a full 3-hour run, not just β=0.5** — that part is structural to the formulation, not an artifact of the diagnostic β override. Findings #2–4 (callback is cheap, weak symmetry-breaking doesn't help, MIPFocus reveals-but-doesn't-break the wall) were only tested at β=0.5 and have not yet been re-examined at β=0.90.
 
 Four independent lines of evidence, gathered across five real-network runs (all at β=0.5 — see scope note above), all point to the same root cause:
 
@@ -230,10 +284,10 @@ Put together: the individual-vehicle formulation, the lazy-callback subtour elim
 
 Framed as discussion points for review, not as a settled recommendation — ranked roughly by how directly each targets the diagnosis above.
 
-### Extend the β=0.90 test before pursuing formulation changes
-*Targets: determining whether a reformulation is even necessary*
+### ~~Extend the β=0.90 test before pursuing formulation changes~~ — DONE (§3.7), answer is negative
+*Targeted: determining whether a reformulation is even necessary*
 
-Given Run 6 (§3.5), this is arguably the highest-priority next step, not a fallback — it's the cheapest possible experiment (zero new code, one parameter) and could substantially change how much of the rest of this list is worth pursuing. A longer β=0.90 cap (e.g. matching Run 5's 3-hour extension) would show whether the accelerating node rate continues long enough to close the IntInf gap and reach a first incumbent, or whether it also plateaus like β=0.5 did once MIPFocus was added — just later. If β=0.90 converges to a usable gap within a practical time budget on its own, the column-generation/Benders/reformulation work below may not be necessary for the production configuration at all.
+**Resolved by Run 8.** A 3-hour β=0.90 extension explored 13,206 nodes (4.8× Run 6/7's count) but moved the best bound only ~0.024% in total and never found an incumbent. The node rate is not a clean accelerating curve either — it includes a ~52-minute near-stall. Extending the time budget further is not a productive lever on its own, at either β value. The column-generation/pattern/Benders directions below are necessary, not optional, if this formulation is to reach a usable gap at real fleet scale.
 
 ### Column generation / Dantzig–Wolfe on a per-vehicle-instance pricing problem
 *Targets: root relaxation strength*
@@ -280,8 +334,13 @@ The existing lazy-callback mechanism is already conceptually a Benders-style cut
 | Run 2 log (F_k=1) | `output/lazy_subtour_stepA_fk1diag_N10_seed32.log` |
 | Run 5 log + memory trace (3hr) | `output/_probe_stepA_mipfocus_3hr.log`, `_probe_stepA_mipfocus_3hr_memlog.csv` |
 | Run 6 log (β=0.90 isolation) | `output/lazy_subtour_stepA_beta090_N10_seed32.log` |
+| Run 7 runner + log (β=0.90 repeat, 45 min) | `scripts/lazy_subtour_run6_repeat.py`, `output/lazy_subtour_run6_repeat_N10_seed32_beta090.log`, `output/lazy_subtour_run6_repeat_summary.txt` |
+| Run 8 runner + log (β=0.90, 3 hr) | `scripts/lazy_subtour_run6_3hr.py`, `output/lazy_subtour_run6_3hr_N10_seed32_beta090.log`, `output/lazy_subtour_run6_3hr_summary.txt` |
+| External memory watchdog (Run 8) | `scripts/memory_watchdog.py`, `output/_run6_3hr_memwatchdog.csv` |
 | Locked aggregate baseline | `output/baseline_aggregate_toy.json` |
 
 All real-network runs: N=10 scenarios, seed=32, real 50-node network via `network/network_builder.py` + `scenarios/scenario_generator.py` + `model/input_builder.py`, `mip_gap` from config default (1%). Vehicle fleet sizes and basing logic from `config/model_parameters.yaml` `vehicles:` block, unchanged except where explicitly overridden (F_k=1 diagnostic).
 
 **Debug toggles added for Run 6** (`model/model.py`, both default to preserving current/post-Run-5 behavior): `_debug_skip_symmetry_break: bool = False` (pass `True` to omit the `VehicleSymmetryBreak` constraint family) and `_debug_mip_focus: int = 1` (pass `0` to restore Gurobi's default balanced focus instead of feasibility-first). Together with the pre-existing `_debug_skip_departure_single_node`, these let any prior run's exact configuration be reproduced for single-variable A/B comparison.
+
+**Debug toggles added for Runs 7–8** (`model/model.py`, both default `None` / no effect): `_debug_node_log_interval_sec: float = None` (periodic node-count/best-bound/sol-count logging inside the lazy callback, at the given interval) and `_debug_incumbent_flag_path: str = None` (writes a marker file the instant a MIPSOL candidate is accepted with zero lazy cuts added — i.e. a genuine incumbent, not just any integer-feasible candidate Gurobi happened to find). `solve_stochastic_cvar` also now routes `SIGTERM` to `model.terminate()` whenever the lazy callback is active, so `scripts/memory_watchdog.py` (or any external monitor) can stop a run cleanly.

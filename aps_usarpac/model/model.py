@@ -42,6 +42,8 @@ def _build_subtour_callback(
     Omega: List[int],
     air_arcs: List[Tuple[int, int]],
     stats: Dict[str, int],
+    node_log_interval_sec: float = None,
+    incumbent_flag_path: str = None,
 ):
     """
     Build a Gurobi lazy-constraint callback enforcing subtour elimination for
@@ -66,6 +68,22 @@ def _build_subtour_callback(
     stats: mutable dict, updated in place with "invocations" (MIPSOL calls
     seen) and "cuts_added" (total lazy constraints emitted) so the caller can
     report them after model.optimize() returns.
+
+    node_log_interval_sec: DIAGNOSTIC ONLY. When set, the callback also
+    handles GRB.Callback.MIP (Gurobi's periodic branch-and-bound polling
+    point, independent of MIPSOL) and appends a
+    {"elapsed_sec", "node_count", "best_bound", "sol_count"} row to
+    stats["node_log"] roughly every node_log_interval_sec of wall-clock
+    solver runtime -- for tracking whether the node-exploration rate is
+    constant, accelerating, or decelerating over a long run. None (default)
+    disables this entirely (no MIP-callback overhead, no behavior change).
+
+    incumbent_flag_path: DIAGNOSTIC ONLY. When set, the first time a MIPSOL
+    is observed (i.e. the solver finds its first incumbent), a one-line
+    marker file is written to this path immediately (elapsed runtime +
+    objective), so an external process tail-ing/polling for this file can
+    detect the event without waiting for model.optimize() to return. None
+    (default) disables this.
     """
     air_arc_set = set(air_arcs)
 
@@ -77,9 +95,24 @@ def _build_subtour_callback(
         group_arcs.setdefault((w, k, l), []).append((i, j))
 
     def callback(model, where):
+        if where == GRB.Callback.MIP and node_log_interval_sec is not None:
+            elapsed = model.cbGet(GRB.Callback.RUNTIME)
+            last = stats.get("_last_node_log_time", -node_log_interval_sec)
+            if elapsed - last >= node_log_interval_sec:
+                stats["_last_node_log_time"] = elapsed
+                stats.setdefault("node_log", []).append({
+                    "elapsed_sec": elapsed,
+                    "node_count": model.cbGet(GRB.Callback.MIP_NODCNT),
+                    "best_bound": model.cbGet(GRB.Callback.MIP_OBJBND),
+                    "sol_count": model.cbGet(GRB.Callback.MIP_SOLCNT),
+                })
+            return
         if where != GRB.Callback.MIPSOL:
             return
         stats["invocations"] += 1
+        cuts_before_this_call = stats["cuts_added"]
+        candidate_elapsed = model.cbGet(GRB.Callback.RUNTIME)
+        candidate_obj = model.cbGet(GRB.Callback.MIPSOL_OBJ)
 
         all_keys = list(n_ind.keys())
         all_vals = model.cbGetSolution([n_ind[key] for key in all_keys])
@@ -133,6 +166,29 @@ def _build_subtour_callback(
                 model.cbLazy(lhs <= len(component) - 1)
                 stats["cuts_added"] += 1
 
+        # A candidate that triggered zero cuts in this call has no subtour
+        # violation and will be accepted by Gurobi as a genuine new
+        # incumbent -- as opposed to one that got a cbLazy cut added, which
+        # Gurobi will reject/discard (SolCount does not advance). Only flag
+        # the former as "first incumbent"; flagging on invocation count
+        # alone (as an earlier version of this callback did) produced false
+        # positives whenever the very first MIPSOL candidate was itself
+        # subtour-violating and got cut.
+        if (
+            incumbent_flag_path is not None
+            and not stats.get("_incumbent_flag_written", False)
+            and stats["cuts_added"] == cuts_before_this_call
+        ):
+            stats["_incumbent_flag_written"] = True
+            try:
+                with open(incumbent_flag_path, "w") as f:
+                    f.write(
+                        f"first_incumbent_elapsed_sec={candidate_elapsed}\n"
+                        f"first_incumbent_obj={candidate_obj}\n"
+                    )
+            except Exception:
+                pass
+
     return callback
 
 
@@ -147,6 +203,8 @@ def solve_stochastic_cvar(
     _debug_skip_departure_single_node: bool = True,
     _debug_skip_symmetry_break: bool = False,
     _debug_mip_focus: int = 1,
+    _debug_node_log_interval_sec: float = None,
+    _debug_incumbent_flag_path: str = None,
 ) -> Dict[str, Any]:
     """
     Solve the extensive-form CVaR stochastic prepositioning model.
@@ -200,6 +258,18 @@ def solve_stochastic_cvar(
             (prioritize finding feasible incumbents). Pass 0 to restore
             Gurobi's own default (balanced) focus, to reproduce the
             baseline behavior from before MIPFocus tuning was introduced.
+        _debug_node_log_interval_sec: DIAGNOSTIC ONLY. When set (and
+            vehicle_formulation="individual"), the subtour callback also logs
+            a (elapsed_sec, node_count, best_bound, sol_count) row roughly
+            every this-many seconds of solver runtime into
+            results["subtour_callback_stats"]["node_log"], independent of
+            MIPSOL activity. None (default) disables this -- no change to
+            existing behavior or overhead.
+        _debug_incumbent_flag_path: DIAGNOSTIC ONLY. When set (and
+            vehicle_formulation="individual"), a one-line marker file is
+            written to this path the instant the first incumbent (MIPSOL) is
+            found, so an external watcher can detect it without waiting for
+            model.optimize() to return. None (default) disables this.
 
     Returns:
         results dictionary with selected sites, objective value, and solution details
@@ -983,7 +1053,7 @@ def solve_stochastic_cvar(
     # has_vehicles AND air_indiv_types is non-empty -- which also implies
     # home_by_k/air_indiv_types were populated by the branch above, so it's
     # safe to reference them here.
-    subtour_stats = {"invocations": 0, "cuts_added": 0}
+    subtour_stats = {"invocations": 0, "cuts_added": 0, "node_log": []}
     subtour_callback = None
     if vehicle_formulation == "individual" and n_ind:
         model.Params.LazyConstraints = 1
@@ -996,6 +1066,8 @@ def solve_stochastic_cvar(
         model.Params.MIPFocus = _debug_mip_focus
         subtour_callback = _build_subtour_callback(
             n_ind, home_by_k, air_indiv_types, Omega, modal_arcs["air"], subtour_stats,
+            node_log_interval_sec=_debug_node_log_interval_sec,
+            incumbent_flag_path=_debug_incumbent_flag_path,
         )
 
     # --- Scenario loss definition (updated for modal arc cost + transfer cost) ---
@@ -1056,7 +1128,24 @@ def solve_stochastic_cvar(
 
     # --- Optimize ---
     if subtour_callback is not None:
-        model.optimize(subtour_callback)
+        # Graceful-shutdown hook for long individual-formulation runs: an
+        # external watchdog (e.g. scripts/memory_watchdog.py, used for
+        # system memory-pressure monitoring independent of Gurobi/this
+        # process) may send SIGTERM. Without this handler, Python's default
+        # SIGTERM behavior kills the process outright, losing the best
+        # incumbent/bound found so far. Routing SIGTERM to model.terminate()
+        # instead lets Gurobi stop cleanly at its next safe checkpoint and
+        # return normally, so results/status/node-count are still usable.
+        import signal as _signal
+
+        def _sigterm_to_terminate(_signum, _frame):
+            model.terminate()
+
+        _prev_handler = _signal.signal(_signal.SIGTERM, _sigterm_to_terminate)
+        try:
+            model.optimize(subtour_callback)
+        finally:
+            _signal.signal(_signal.SIGTERM, _prev_handler)
     else:
         model.optimize()
 
