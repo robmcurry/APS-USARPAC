@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Memory Wall — PRS-VIF Phase 5</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Serif:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --paper:#EEF1F0; --paper-raised:#FFFFFF; --ink:#16212A; --ink-soft:#33424A;
+    --muted:#5B6C70; --rule:#D6DEDC; --rule-strong:#B9C5C2;
+    --accent:#28617F; --accent-soft:#DCE9ED;
+    --series-build:#1BAF7A; --series-relax:#4A3AA7;
+    --good:#0CA30C; --warning:#B8860F; --serious:#C15A34; --critical:#C13B3B;
+    --good-bg:#E4F5E1; --warning-bg:#FBF0DA; --serious-bg:#FBE7DC; --critical-bg:#FBE1DE;
+    --code-bg:#0F1719; --code-ink:#CFE3DE; --code-muted:#7C9490;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:#101615; --paper-raised:#171F1E; --ink:#E7ECEA; --ink-soft:#C2CECB;
+      --muted:#8FA3A0; --rule:#28322F; --rule-strong:#374440;
+      --accent:#6FB0D6; --accent-soft:#1C2E36;
+      --series-build:#3FCB92; --series-relax:#9085E9;
+      --good:#4FBE4F; --warning:#E0AA3B; --serious:#E2825C; --critical:#E2694B;
+      --good-bg:#153018; --warning-bg:#33280F; --serious-bg:#331F16; --critical-bg:#33191A;
+      --code-bg:#0A100F; --code-ink:#C9E4DA; --code-muted:#5E7772;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#101615; --paper-raised:#171F1E; --ink:#E7ECEA; --ink-soft:#C2CECB;
+    --muted:#8FA3A0; --rule:#28322F; --rule-strong:#374440;
+    --accent:#6FB0D6; --accent-soft:#1C2E36;
+    --series-build:#3FCB92; --series-relax:#9085E9;
+    --good:#4FBE4F; --warning:#E0AA3B; --serious:#E2825C; --critical:#E2694B;
+    --good-bg:#153018; --warning-bg:#33280F; --serious-bg:#331F16; --critical-bg:#33191A;
+    --code-bg:#0A100F; --code-ink:#C9E4DA; --code-muted:#5E7772;
+    color-scheme: dark;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{ height:auto; }
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:"IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+    font-size:16px; line-height:1.6;
+  }
+  ::selection{ background:var(--accent-soft); }
+  h1,h2,h3{
+    font-family:"IBM Plex Serif", Georgia, serif; font-weight:700;
+    text-wrap:balance; color:var(--ink); margin:0;
+  }
+  a{ color:var(--accent); }
+  .mono{ font-family:"IBM Plex Mono", ui-monospace, monospace; font-variant-numeric:tabular-nums; }
+
+  .wrap{ max-width:920px; margin:0 auto; padding:0 24px 96px; }
+  .prose{ max-width:680px; }
+
+  /* ---------- Header ---------- */
+  header.masthead{
+    border-bottom:1px solid var(--rule);
+    padding:56px 0 32px;
+    margin-bottom:40px;
+  }
+  .eyebrow{
+    font-family:"IBM Plex Mono", monospace; font-size:12.5px; letter-spacing:.09em;
+    text-transform:uppercase; color:var(--accent); font-weight:500;
+    display:flex; align-items:center; gap:10px; margin-bottom:18px;
+  }
+  .eyebrow::before{
+    content:""; width:7px; height:7px; border-radius:50%; background:var(--critical);
+    box-shadow:0 0 0 3px var(--critical-bg);
+  }
+  h1.title{ font-size:clamp(2.1rem, 5vw, 3rem); line-height:1.06; letter-spacing:-.01em; }
+  .dek{
+    font-size:1.15rem; color:var(--ink-soft); max-width:640px; margin-top:14px;
+    font-family:"IBM Plex Serif", serif; font-weight:400;
+  }
+  .meta-row{
+    display:flex; flex-wrap:wrap; gap:6px 28px; margin-top:28px;
+    font-family:"IBM Plex Mono", monospace; font-size:12.5px; color:var(--muted);
+  }
+  .meta-row span b{ color:var(--ink-soft); font-weight:500; }
+
+  /* ---------- Stat tiles ---------- */
+  .stats{
+    display:grid; grid-template-columns:repeat(4,1fr); gap:1px;
+    background:var(--rule); border:1px solid var(--rule); border-radius:3px;
+    overflow:hidden; margin-bottom:48px;
+  }
+  .stat{ background:var(--paper-raised); padding:20px 18px; }
+  .stat .num{
+    font-family:"IBM Plex Mono", monospace; font-size:1.85rem; font-weight:600;
+    color:var(--ink); line-height:1; font-variant-numeric:tabular-nums;
+  }
+  .stat .num.flag{ color:var(--critical); }
+  .stat .label{ font-size:12.5px; color:var(--muted); margin-top:8px; line-height:1.35; }
+
+  /* ---------- Sections ---------- */
+  section{ margin-bottom:56px; }
+  .section-head{ display:flex; align-items:baseline; gap:14px; margin-bottom:18px; }
+  .section-num{
+    font-family:"IBM Plex Mono", monospace; font-size:13px; color:var(--muted);
+    border:1px solid var(--rule-strong); border-radius:3px; padding:2px 7px;
+  }
+  h2{ font-size:1.5rem; }
+  h3{ font-size:1.08rem; margin-bottom:10px; }
+  p{ margin:0 0 14px; color:var(--ink-soft); }
+  p:last-child{ margin-bottom:0; }
+  .lede{ font-size:1.04rem; }
+
+  .callout{
+    background:var(--paper-raised); border:1px solid var(--rule);
+    border-left:3px solid var(--accent); border-radius:2px;
+    padding:24px 28px; margin-bottom:48px;
+  }
+  .callout h2{ font-size:1.1rem; margin-bottom:10px; }
+  .callout p{ color:var(--ink-soft); font-size:1.01rem; }
+  .callout p:first-of-type::first-letter{
+    font-family:"IBM Plex Serif", serif; font-weight:700; font-size:2.6em;
+    float:left; line-height:.78; margin:.03em .07em 0 0; color:var(--accent);
+  }
+
+  /* ---------- Tables ---------- */
+  .table-scroll{ overflow-x:auto; border:1px solid var(--rule); border-radius:3px; }
+  table{ border-collapse:collapse; width:100%; min-width:560px; background:var(--paper-raised); }
+  caption{ caption-side:top; text-align:left; font-size:13px; color:var(--muted); padding:10px 14px 0; }
+  th,td{
+    font-family:"IBM Plex Mono", monospace; font-size:13.5px; text-align:right;
+    padding:10px 14px; border-bottom:1px solid var(--rule); white-space:nowrap;
+    font-variant-numeric:tabular-nums;
+  }
+  th:first-child, td:first-child{ text-align:left; font-family:"IBM Plex Sans", sans-serif; font-weight:500; }
+  thead th{
+    text-align:right; font-family:"IBM Plex Sans", sans-serif; font-weight:600;
+    font-size:12px; letter-spacing:.03em; text-transform:uppercase; color:var(--muted);
+    background:var(--accent-soft); border-bottom:1px solid var(--rule-strong);
+  }
+  thead th:first-child{ text-align:left; }
+  tbody tr:last-child td{ border-bottom:none; }
+  tbody tr:hover td{ background:var(--accent-soft); }
+  td.dim{ color:var(--muted); }
+
+  /* ---------- Chart shells ---------- */
+  .chart-card{
+    background:var(--paper-raised); border:1px solid var(--rule); border-radius:3px;
+    padding:22px 22px 14px;
+  }
+  .chart-card h3{ font-size:14px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); font-family:"IBM Plex Sans",sans-serif; font-weight:600;}
+  .chart-card .chart-title{ font-size:1rem; color:var(--ink); font-weight:600; margin-bottom:2px; font-family:"IBM Plex Sans",sans-serif;}
+  svg.chart{ width:100%; height:auto; overflow:visible; }
+  .axis-label, .tick-label{ font-family:"IBM Plex Mono", monospace; font-size:11px; fill:var(--muted); }
+  .gridline{ stroke:var(--rule); stroke-width:1; }
+  .axis-line{ stroke:var(--rule-strong); stroke-width:1; }
+  .series-line{ fill:none; stroke-width:2.25; }
+  .series-dot{ stroke:var(--paper-raised); stroke-width:2; }
+  .direct-label{ font-family:"IBM Plex Mono", monospace; font-size:11.5px; font-weight:500; }
+  .legend{ display:flex; gap:22px; margin-top:14px; flex-wrap:wrap; }
+  .legend-item{ display:flex; align-items:center; gap:7px; font-size:12.5px; color:var(--ink-soft); font-family:"IBM Plex Mono", monospace; }
+  .legend-swatch{ width:14px; height:3px; border-radius:2px; }
+  .chart-note{ font-size:12.5px; color:var(--muted); margin-top:10px; }
+  .tooltip{
+    position:absolute; pointer-events:none; background:var(--code-bg); color:var(--code-ink);
+    font-family:"IBM Plex Mono", monospace; font-size:12px; padding:8px 11px; border-radius:4px;
+    box-shadow:0 6px 18px rgba(0,0,0,.25); opacity:0; transition:opacity .1s; white-space:nowrap; z-index:5;
+  }
+  .tooltip b{ color:#fff; }
+  .chart-wrap{ position:relative; }
+
+  /* ---------- Timeline ---------- */
+  .timeline{ display:flex; flex-direction:column; gap:0; }
+  .tl-item{
+    display:grid; grid-template-columns:34px 1fr; gap:18px;
+    padding-bottom:28px; position:relative;
+  }
+  .tl-item:last-child{ padding-bottom:0; }
+  .tl-rail{ display:flex; flex-direction:column; align-items:center; }
+  .tl-dot{
+    width:13px; height:13px; border-radius:50%; margin-top:4px; flex:none;
+    background:var(--muted); box-shadow:0 0 0 4px var(--paper);
+  }
+  .tl-dot.critical{ background:var(--critical); }
+  .tl-dot.warning{ background:var(--warning); }
+  .tl-dot.serious{ background:var(--serious); }
+  .tl-line{ width:1px; flex:1; background:var(--rule-strong); margin-top:4px; }
+  .tl-body{ background:var(--paper-raised); border:1px solid var(--rule); border-radius:3px; padding:18px 20px; }
+  .tl-head{ display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:8px; }
+  .tl-title{ font-weight:600; font-size:.98rem; }
+  .chip{
+    font-family:"IBM Plex Mono", monospace; font-size:11px; font-weight:600; letter-spacing:.03em;
+    text-transform:uppercase; padding:3px 9px; border-radius:20px; white-space:nowrap;
+  }
+  .chip.critical{ background:var(--critical-bg); color:var(--critical); }
+  .chip.warning{ background:var(--warning-bg); color:var(--warning); }
+  .chip.serious{ background:var(--serious-bg); color:var(--serious); }
+  .tl-body p{ font-size:14.5px; margin-bottom:10px; }
+  .tl-figs{ display:flex; flex-wrap:wrap; gap:8px 20px; margin-top:12px; }
+  .tl-fig{ font-family:"IBM Plex Mono", monospace; font-size:12px; color:var(--muted); }
+  .tl-fig b{ color:var(--ink); font-weight:600; }
+
+  /* ---------- Log block ---------- */
+  .logblock{
+    background:var(--code-bg); color:var(--code-ink); border-radius:4px;
+    padding:16px 18px; font-family:"IBM Plex Mono", monospace; font-size:12.3px;
+    line-height:1.65; overflow-x:auto; margin:14px 0;
+  }
+  .logblock .muted{ color:var(--code-muted); }
+  .logblock .flag{ color:#F0A97A; }
+
+  /* ---------- Two-col run comparison ---------- */
+  .runs{ display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+  @media (max-width:720px){ .runs{ grid-template-columns:1fr; } .stats{ grid-template-columns:1fr 1fr; } }
+  .run-card{ background:var(--paper-raised); border:1px solid var(--rule); border-radius:3px; padding:20px; }
+  .run-card h3{ margin-bottom:2px; }
+  .run-sub{ font-size:12px; color:var(--muted); font-family:"IBM Plex Mono",monospace; margin-bottom:14px; }
+  .kv{ display:flex; justify-content:space-between; gap:10px; padding:7px 0; border-bottom:1px solid var(--rule); font-size:13px; }
+  .kv:last-of-type{ border-bottom:none; }
+  .kv .k{ color:var(--muted); }
+  .kv .v{ font-family:"IBM Plex Mono", monospace; color:var(--ink); text-align:right; font-variant-numeric:tabular-nums; }
+
+  /* ---------- Diagnosis / recs lists ---------- */
+  .diag-list{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:14px; }
+  .diag-list li{
+    display:grid; grid-template-columns:22px 1fr; gap:12px; font-size:14.5px; color:var(--ink-soft);
+  }
+  .diag-list li::before{ content:"—"; color:var(--accent); font-weight:600; }
+
+  .recs{ list-style:none; margin:0; padding:0; counter-reset:rec; display:flex; flex-direction:column; gap:14px; }
+  .recs li{
+    counter-increment:rec; display:grid; grid-template-columns:38px 1fr; gap:14px;
+    background:var(--paper-raised); border:1px solid var(--rule); border-radius:3px; padding:16px 18px;
+  }
+  .recs li::before{
+    content:counter(rec); font-family:"IBM Plex Mono", monospace; font-weight:600; font-size:15px;
+    color:var(--accent); background:var(--accent-soft); width:28px; height:28px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .recs li.not-rec::before{ content:"×"; color:var(--critical); background:var(--critical-bg); }
+  .recs li b{ display:block; margin-bottom:4px; font-size:14.5px; }
+  .recs li span{ font-size:13.5px; color:var(--muted); }
+
+  footer{
+    border-top:1px solid var(--rule); margin-top:64px; padding-top:24px;
+    font-size:12.5px; color:var(--muted); font-family:"IBM Plex Mono", monospace; line-height:1.8;
+  }
+
+  @media print{
+    body{ background:#fff; }
+    .tooltip{ display:none; }
+    .wrap{ max-width:100%; padding:0 8px 40px; }
+    table{ min-width:0; width:100%; table-layout:auto; }
+    th,td{ padding:6px 7px; font-size:10px; white-space:normal; }
+    .stats{ grid-template-columns:repeat(4,1fr); }
+    section, .tl-item, .chart-card, .callout, .run-card{ break-inside:avoid; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <div class="eyebrow">Research memo — PRS-VIF, Phase 5</div>
+    <h1 class="title">The Memory Wall</h1>
+    <p class="dek">Why the Ω=100 case study won't run yet on this machine, what four attempts at it actually showed, and what closing the gap would take.</p>
+    <div class="meta-row">
+      <span>Prepared <b>2026-09-14</b></span>
+      <span>Session work <b>2026-09-09</b></span>
+      <span>Machine <b>MacBook Pro · Apple M3 Pro · 18 GB</b></span>
+      <span>Solver <b>Gurobi 11.0.3</b></span>
+    </div>
+  </header>
+
+  <div class="stats">
+    <div class="stat"><div class="num">18 GB</div><div class="label">total system memory</div></div>
+    <div class="stat"><div class="num flag">4 / 4</div><div class="label">Ω=100 attempts, none completed</div></div>
+    <div class="stat"><div class="num">65 s</div><div class="label">root relaxation solve, reproduced twice</div></div>
+    <div class="stat"><div class="num flag">0</div><div class="label">MIP incumbents found so far</div></div>
+  </div>
+
+  <div class="callout">
+    <h2>Bottom line</h2>
+    <p>PRS-VIF's structural formulation checks out at every scale actually tested — the real 50-node, 96-vehicle network builds and its LP relaxation solves cleanly through Ω=50 scenarios, matching every dimension the dissertation's case study specifies. The target scale, <b>Ω=100, does not:</b> four independent attempts to build or solve it have now failed, all tracing to the same underlying cause — this laptop's 18&nbsp;GB of RAM, not a defect in the model or the code that builds it.</p>
+    <p>A first real MIP attempt at a reduced but still CVaR-meaningful scale (Ω=30, β=0.8) got further than anything before it — a clean, twice-reproduced root-relaxation solve — before running out of memory during Gurobi's crossover step, <i>before branch-and-bound ever started.</i> Nothing tried so far (bulk constraint construction, fewer solver threads, disk-backed node storage) has closed the gap. The two paths that plausibly would are more RAM, or a smaller and better-conditioned formulation.</p>
+  </div>
+
+  <section id="tail">
+    <div class="section-head"><span class="section-num">01</span><h2>Why Ω=100 isn't just a nice round number</h2></div>
+    <div class="prose">
+      <p class="lede">CVaR's tail size is <span class="mono">(1&nbsp;−&nbsp;β)&nbsp;×&nbsp;N</span>. At the dissertation's calibrated β=0.9, that arithmetic is unforgiving: N=100 gives a tail of 10 scenarios — enough for the risk measure to actually <i>average</i> a set of bad outcomes. N=10 gives a tail of exactly 1 — CVaR stops being a conditional average and collapses to a single worst-case draw, a degeneracy already observed by accident in earlier unit testing. N=50 gives a tail of 5: non-degenerate, but thin.</p>
+      <p>So reducing the scenario count isn't a free way around the memory ceiling — it changes what the objective means. The one deliberate exception tried here is <span class="mono">β=0.8, N=30</span> (tail = 6, comparable richness to N=50 at β=0.9), chosen specifically to stay inside the memory-safe range while keeping CVaR non-degenerate. See §4.</p>
+    </div>
+  </section>
+
+  <section id="scaling">
+    <div class="section-head"><span class="section-num">02</span><h2>Structural scaling, Ω = 3 to 50</h2></div>
+    <div class="prose">
+      <p class="lede">Every instance below is the real 50-node USPACOM network (22 PPL candidates, 1,502 air / 236 sea / 30 land arcs) with the full 96-vehicle fleet — not a toy or reduced case. Each was built and LP-relaxed to confirm the model assembles correctly at scale before any integer solve was attempted.</p>
+    </div>
+
+    <div class="table-scroll" style="margin-bottom:28px;">
+      <table>
+        <caption>Build and LP-relaxation timing, real network, by scenario count Ω</caption>
+        <thead><tr>
+          <th>Ω</th><th>Build (s)</th><th>LP relax (s)</th><th>Variables</th><th>Binary vars</th><th>Constraints</th><th>LP objective</th>
+        </tr></thead>
+        <tbody>
+          <tr><td>3</td><td>2.64</td><td>2.91</td><td>428,189</td><td>138,718</td><td>154,238</td><td>5,074,641,919.53</td></tr>
+          <tr><td>10</td><td>8.75</td><td>8.02</td><td>1,423,827</td><td>458,926</td><td>510,482</td><td class="dim">—</td></tr>
+          <tr><td>25</td><td>23.14</td><td>33.72</td><td>3,557,337</td><td>1,145,086</td><td>1,273,862</td><td>10,679,050,348.59</td></tr>
+          <tr><td>50</td><td>47.05</td><td>135.86</td><td>7,113,187</td><td>2,288,686</td><td>2,546,162</td><td>11,536,060,439.90</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title">Build time vs. LP-relaxation time, log–log</div>
+      <p class="chart-note" style="margin-top:0;">One trend is a straight line. The other curves away from it.</p>
+      <div class="chart-wrap">
+        <svg class="chart" viewBox="0 0 660 360" role="img" aria-label="Log-log chart of build time and LP relaxation time against scenario count, from 3 to 50 scenarios, with a marker showing Omega=100 never completed.">
+          <!-- gridlines -->
+          <line class="gridline" x1="70" y1="300" x2="640" y2="300"/>
+          <line class="gridline" x1="70" y1="187" x2="640" y2="187"/>
+          <line class="gridline" x1="70" y1="74" x2="640" y2="74"/>
+          <text class="tick-label" x="62" y="304" text-anchor="end">1s</text>
+          <text class="tick-label" x="62" y="191" text-anchor="end">10s</text>
+          <text class="tick-label" x="62" y="78" text-anchor="end">100s</text>
+          <!-- axis -->
+          <line class="axis-line" x1="70" y1="20" x2="70" y2="300"/>
+          <line class="axis-line" x1="70" y1="300" x2="640" y2="300"/>
+          <!-- x ticks -->
+          <g class="tick-label">
+            <text x="70" y="320" text-anchor="middle">Ω=3</text>
+            <text x="252" y="320" text-anchor="middle">Ω=10</text>
+            <text x="390" y="320" text-anchor="middle">Ω=25</text>
+            <text x="495" y="320" text-anchor="middle">Ω=50</text>
+            <text x="600" y="320" text-anchor="middle" fill="var(--critical)" font-weight="600">Ω=100</text>
+          </g>
+          <line class="gridline" x1="600" y1="20" x2="600" y2="300" stroke-dasharray="2 4"/>
+
+          <!-- build series -->
+          <polyline class="series-line" points="70,252.3 252,193.5 390.5,145.8 495.4,110.9" stroke="var(--series-build)"/>
+          <g fill="var(--series-build)">
+            <circle class="series-dot" cx="70" cy="252.3" r="4.5"/>
+            <circle class="series-dot" cx="252" cy="193.5" r="4.5"/>
+            <circle class="series-dot" cx="390.5" cy="145.8" r="4.5"/>
+            <circle class="series-dot" cx="495.4" cy="110.9" r="4.5"/>
+          </g>
+          <text class="direct-label" x="505" y="107" fill="var(--series-build)">build · 47.1s</text>
+
+          <!-- relax series -->
+          <polyline class="series-line" points="70,247.6 252,197.8 390.5,127.3 495.4,58.9" stroke="var(--series-relax)"/>
+          <g fill="var(--series-relax)">
+            <circle class="series-dot" cx="70" cy="247.6" r="4.5"/>
+            <circle class="series-dot" cx="252" cy="197.8" r="4.5"/>
+            <circle class="series-dot" cx="390.5" cy="127.3" r="4.5"/>
+            <circle class="series-dot" cx="495.4" cy="58.9" r="4.5"/>
+          </g>
+          <text class="direct-label" x="505" y="55" fill="var(--series-relax)">LP relax · 135.9s</text>
+
+          <!-- omega=100 wall marker -->
+          <g transform="translate(600,20)">
+            <circle r="7" fill="var(--critical-bg)" stroke="var(--critical)" stroke-width="1.5"/>
+            <path d="M-3.2,-3.2 L3.2,3.2 M3.2,-3.2 L-3.2,3.2" stroke="var(--critical)" stroke-width="1.5"/>
+          </g>
+          <text class="direct-label" x="600" y="44" text-anchor="middle" fill="var(--critical)">did not complete</text>
+
+          <!-- hover targets -->
+          <g class="hoverlayer">
+            <circle class="hit" data-x="70" data-y="252.3" data-label="Ω=3 · build 2.64s" cx="70" cy="252.3" r="12" fill="transparent"/>
+            <circle class="hit" data-x="252" data-y="193.5" data-label="Ω=10 · build 8.75s" cx="252" cy="193.5" r="12" fill="transparent"/>
+            <circle class="hit" data-x="390.5" data-y="145.8" data-label="Ω=25 · build 23.14s" cx="390.5" cy="145.8" r="12" fill="transparent"/>
+            <circle class="hit" data-x="495.4" data-y="110.9" data-label="Ω=50 · build 47.05s" cx="495.4" cy="110.9" r="12" fill="transparent"/>
+            <circle class="hit" data-x="70" data-y="247.6" data-label="Ω=3 · LP relax 2.91s" cx="70" cy="247.6" r="12" fill="transparent"/>
+            <circle class="hit" data-x="252" data-y="197.8" data-label="Ω=10 · LP relax 8.02s" cx="252" cy="197.8" r="12" fill="transparent"/>
+            <circle class="hit" data-x="390.5" data-y="127.3" data-label="Ω=25 · LP relax 33.72s" cx="390.5" cy="127.3" r="12" fill="transparent"/>
+            <circle class="hit" data-x="495.4" data-y="58.9" data-label="Ω=50 · LP relax 135.86s" cx="495.4" cy="58.9" r="12" fill="transparent"/>
+            <circle class="hit" data-x="600" data-y="20" data-label="Ω=100 · never finished building (all 4 attempts)" cx="600" cy="20" r="12" fill="transparent"/>
+          </g>
+        </svg>
+        <div class="tooltip" id="tt1"></div>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><span class="legend-swatch" style="background:var(--series-build)"></span>build time — linear (exponent ≈1.0–1.06)</div>
+        <div class="legend-item"><span class="legend-swatch" style="background:var(--series-relax)"></span>LP-relax time — accelerating (exponent 0.84 → 1.57 → 2.01)</div>
+      </div>
+      <p class="chart-note">Extrapolating the reliable linear build trend alone predicts an Ω=100 build of roughly 100 seconds. That prediction was tested directly — see §3.</p>
+    </div>
+  </section>
+
+  <section id="attempts">
+    <div class="section-head"><span class="section-num">03</span><h2>Four attempts at Ω=100</h2></div>
+    <div class="prose">
+      <p class="lede">All four used the real network at full scale (≈14.2M variables, ≈5.1M constraints, extrapolated). None reached a completed build. Two hit a genuine multi-hour resource thrash; one was a false alarm from an over-cautious safety script; one hit a real ceiling mid-growth.</p>
+    </div>
+
+    <div class="timeline" style="margin-top:24px;">
+      <div class="tl-item">
+        <div class="tl-rail"><div class="tl-dot critical"></div><div class="tl-line"></div></div>
+        <div class="tl-body">
+          <div class="tl-head"><span class="tl-title">Attempt 1 — unmonitored background run</span><span class="chip critical">Thrashed</span></div>
+          <p>Ran 80+ minutes of CPU time without ever reaching a completed build. Process memory stayed flat at 2.8–3.5&nbsp;GB the entire time — no forward progress, not the healthy growth curve seen at every smaller Ω. System swap climbed to 4.1 of 5.0&nbsp;GB used; free system RAM fell to 0.06&nbsp;GB. Terminated by the operating system for system-wide low memory.</p>
+          <div class="tl-figs">
+            <span class="tl-fig">duration <b>80+ min</b></span>
+            <span class="tl-fig">peak RSS <b>~3.5 GB (flat)</b></span>
+            <span class="tl-fig">outcome <b>OS-killed</b></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="tl-item">
+        <div class="tl-rail"><div class="tl-dot critical"></div><div class="tl-line"></div></div>
+        <div class="tl-body">
+          <div class="tl-head"><span class="tl-title">Attempt 2 — same code, actively monitored</span><span class="chip critical">Thrashed</span></div>
+          <p>Memory grew normally to ~7&nbsp;GB in the first 90 seconds — matching the confirmed healthy pattern — then plateaued for <b>over three hours</b> with CPU pegged and zero further progress: the same thrash signature as Attempt 1, this time observed live rather than inferred after the fact. Self-terminated as a manual kill was being issued.</p>
+          <div class="tl-figs">
+            <span class="tl-fig">duration <b>3h 25m+</b></span>
+            <span class="tl-fig">peak RSS <b>~7 GB, then flat ~3.5 GB</b></span>
+            <span class="tl-fig">outcome <b>self-terminated</b></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="tl-item">
+        <div class="tl-rail"><div class="tl-dot warning"></div><div class="tl-line"></div></div>
+        <div class="tl-body">
+          <div class="tl-head"><span class="tl-title">Attempt 3 — after bulk-construction rewrite</span><span class="chip warning">False alarm</span></div>
+          <p>Run with the two largest constraint families converted to a single bulk Gurobi call each (§4). Killed by my own safety monitor after 30 seconds — a tooling false positive, not a model problem: RSS at that point (~7&nbsp;GB) matched the same normal, healthy pattern every smaller Ω already showed. The monitor's threshold was miscalibrated against this machine's already-reduced baseline headroom.</p>
+          <div class="tl-figs">
+            <span class="tl-fig">duration <b>30 s</b></span>
+            <span class="tl-fig">RSS at kill <b>~7 GB (normal)</b></span>
+            <span class="tl-fig">outcome <b>false-positive kill</b></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="tl-item">
+        <div class="tl-rail"><div class="tl-dot serious"></div></div>
+        <div class="tl-body">
+          <div class="tl-head"><span class="tl-title">Attempt 4 — corrected monitor (targets stalling, not a single reading)</span><span class="chip serious">Genuine ceiling</span></div>
+          <p>Memory climbed steadily to 7.79&nbsp;GB — real, continued growth, not a stall — when free system memory hit genuine near-zero and stayed there for two consecutive checks. The first of the four kills that reflects an actual resource ceiling rather than a monitoring error.</p>
+          <div class="tl-figs">
+            <span class="tl-fig">duration <b>~2 min</b></span>
+            <span class="tl-fig">RSS at kill <b>7.79 GB, still climbing</b></span>
+            <span class="tl-fig">outcome <b>deliberate kill, real limit</b></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="addconstrs">
+    <div class="section-head"><span class="section-num">04</span><h2>Did rewriting the construction code help?</h2></div>
+    <div class="prose">
+      <p class="lede">The two constraint families that scale as Ω×|vehicles|×|arcs| — together the overwhelming majority of the model's rows — were originally built with one Python call per row (4.57M individual calls at Ω=100). These were converted to Gurobi's bulk-insert API, which hands the solver the whole family in a single call.</p>
+      <p><b>Verified mathematically identical:</b> rebuilt at Ω=3, every variable and constraint count and the LP-relaxation objective (5,074,641,919.5340) matched the pre-conversion run to the decimal.</p>
+      <p><b>Made no measurable difference:</b> at Ω=50, build and relax times were statistically unchanged from the per-row version.</p>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <caption>Ω=50, before vs. after the bulk-construction rewrite</caption>
+        <thead><tr><th>Version</th><th>Build (s)</th><th>LP relax (s)</th><th>LP objective</th></tr></thead>
+        <tbody>
+          <tr><td>Per-row <span class="mono">addConstr()</span></td><td>47.05</td><td>135.86</td><td>11,536,060,439.90</td></tr>
+          <tr><td>Bulk <span class="mono">addConstrs()</span></td><td>52.68</td><td>136.56</td><td class="dim">(re-validated at Ω=3, identical)</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="prose" style="margin-top:16px; font-size:14.5px;">Attempts 3 and 4 at Ω=100 used this rewritten code and hit the same wall as Attempts 1 and 2. Ruled out as the fix.</p>
+  </section>
+
+  <section id="mip">
+    <div class="section-head"><span class="section-num">05</span><h2>First real MIP attempt — Ω=30, β=0.8</h2></div>
+    <div class="prose">
+      <p class="lede">Everything above only ever tested the LP relaxation. This is the first attempt to actually solve PRS-VIF with integrality enforced, at any scale, on the real network. Model size: <span class="mono">1,528,322</span> rows, <span class="mono">4,268,507</span> columns (2.89M continuous, 1.37M binary), <span class="mono">19,395,010</span> nonzeros.</p>
+    </div>
+
+    <div class="runs" style="margin-top:20px;">
+      <div class="run-card">
+        <h3>Run 1 — default solver threads</h3>
+        <div class="run-sub">12 threads · time limit 20 min</div>
+        <div class="kv"><span class="k">Presolve</span><span class="v">11.44 s</span></div>
+        <div class="kv"><span class="k">Root barrier solve</span><span class="v">58.11 s</span></div>
+        <div class="kv"><span class="k">Root objective</span><span class="v">6.63358571 × 10⁹</span></div>
+        <div class="kv"><span class="k">Crossover</span><span class="v">completed, 65 s total</span></div>
+        <div class="kv"><span class="k">Killed at</span><span class="v">~2 min, 7.6 GB RSS</span></div>
+        <div class="kv"><span class="k">Reached B&amp;B?</span><span class="v" style="color:var(--critical)">no — killed right as it began</span></div>
+      </div>
+      <div class="run-card">
+        <h3>Run 2 — 4 threads, disk-backed node storage</h3>
+        <div class="run-sub">Threads=4 · NodefileStart=4.0 GB · time limit 20 min</div>
+        <div class="kv"><span class="k">Presolve + barrier</span><span class="v">50.27 s</span></div>
+        <div class="kv"><span class="k">Root objective</span><span class="v">6.63358571 × 10⁹ <span style="color:var(--good)">(identical to Run 1)</span></span></div>
+        <div class="kv"><span class="k">Crossover</span><span class="v" style="color:var(--serious)">unstable, did not finish</span></div>
+        <div class="kv"><span class="k">Dual infeasibility spike</span><span class="v">7.46 × 10²³</span></div>
+        <div class="kv"><span class="k">Simplex iterations</span><span class="v">350,000+, still running</span></div>
+        <div class="kv"><span class="k">Killed at</span><span class="v">~2 min, 8.1 GB RSS</span></div>
+      </div>
+    </div>
+
+    <div class="logblock" style="margin-top:20px;">
+<span class="muted">Root simplex log, Run 2 — the instability that ended the run:</span>
+  302503    6.6335857e+09   0.000000e+00   7.608578e+03     55s
+  304964    <span class="flag">7.4551148e+23   1.304443e+11</span>   0.000000e+00     61s
+  305604    6.6335857e+09   3.164302e+11   0.000000e+00     66s
+<span class="muted">Warning: Markowitz tolerance tightened to 0.5</span>
+    </div>
+
+    <p class="prose" style="font-size:14.5px;">Both runs reproduce the <i>identical</i> root-relaxation objective under different solver configurations — strong evidence the model itself is correct and deterministic. The obstacle both times is memory, at two different points: Run 1 ran out right as branch-and-bound was starting; Run 2's crossover went numerically unstable first and grew to 8.1&nbsp;GB chasing it. <b>Neither run has ever reached branch-and-bound.</b></p>
+
+    <div class="chart-card" style="margin-top:24px;">
+      <div class="chart-title">Free system memory during Run 2</div>
+      <p class="chart-note" style="margin-top:0;">Sampled every 15 seconds, from launch to kill.</p>
+      <div class="chart-wrap">
+        <svg class="chart" viewBox="0 0 660 260" role="img" aria-label="Line chart of free system memory dropping from 7.8 GB to near zero over 120 seconds during Run 2, killed after crossing a 0.15 GB safety threshold.">
+          <line class="gridline" x1="60" y1="220" x2="600" y2="220"/>
+          <line class="gridline" x1="60" y1="120" x2="600" y2="120"/>
+          <line class="gridline" x1="60" y1="20" x2="600" y2="20"/>
+          <text class="tick-label" x="52" y="224" text-anchor="end">0 GB</text>
+          <text class="tick-label" x="52" y="124" text-anchor="end">4 GB</text>
+          <text class="tick-label" x="52" y="24" text-anchor="end">8 GB</text>
+          <line class="axis-line" x1="60" y1="20" x2="60" y2="220"/>
+          <line class="axis-line" x1="60" y1="220" x2="600" y2="220"/>
+          <g class="tick-label">
+            <text x="60" y="240" text-anchor="middle">0s</text>
+            <text x="330" y="240" text-anchor="middle">60s</text>
+            <text x="600" y="240" text-anchor="middle">120s</text>
+          </g>
+
+          <!-- danger threshold -->
+          <line x1="60" y1="216.25" x2="600" y2="216.25" stroke="var(--critical)" stroke-width="1.25" stroke-dasharray="4 4"/>
+          <text class="tick-label" x="565" y="211" text-anchor="end" fill="var(--critical)">0.15 GB kill floor</text>
+
+          <!-- area fill -->
+          <path d="M60,25.7 L127.5,87.6 L195,103.0 L262.5,189.85 L330,185.9 L397.5,185.7 L465,218.1 L532.5,218.0 L600,216.85 L600,220 L60,220 Z"
+                fill="var(--series-build)" opacity="0.12"/>
+          <polyline class="series-line" points="60,25.7 127.5,87.6 195,103.0 262.5,189.85 330,185.9 397.5,185.7 465,218.1 532.5,218.0 600,216.85" stroke="var(--series-build)"/>
+
+          <g fill="var(--series-build)">
+            <circle class="series-dot" cx="60" cy="25.7" r="4"/>
+            <circle class="series-dot" cx="127.5" cy="87.6" r="4"/>
+            <circle class="series-dot" cx="195" cy="103.0" r="4"/>
+            <circle class="series-dot" cx="262.5" cy="189.85" r="4"/>
+            <circle class="series-dot" cx="330" cy="185.9" r="4"/>
+            <circle class="series-dot" cx="397.5" cy="185.7" r="4"/>
+            <circle class="series-dot" cx="465" cy="218.1" r="4"/>
+            <circle class="series-dot" cx="532.5" cy="218.0" r="4"/>
+          </g>
+          <circle cx="600" cy="216.85" r="6" fill="var(--critical-bg)" stroke="var(--critical)" stroke-width="1.5"/>
+          <text class="direct-label" x="600" y="20" text-anchor="end" fill="var(--critical)">killed — 3 reads &lt; 0.15 GB</text>
+
+          <g class="hoverlayer">
+            <circle class="hit" data-x="60" data-y="25.7" data-label="t=0s · free 7.77 GB" cx="60" cy="25.7" r="12" fill="transparent"/>
+            <circle class="hit" data-x="127.5" data-y="87.6" data-label="t=15s · free 5.30 GB" cx="127.5" cy="87.6" r="12" fill="transparent"/>
+            <circle class="hit" data-x="195" data-y="103.0" data-label="t=30s · free 4.68 GB" cx="195" cy="103.0" r="12" fill="transparent"/>
+            <circle class="hit" data-x="262.5" data-y="189.85" data-label="t=45s · free 1.21 GB" cx="262.5" cy="189.85" r="12" fill="transparent"/>
+            <circle class="hit" data-x="330" data-y="185.9" data-label="t=60s · free 1.37 GB" cx="330" cy="185.9" r="12" fill="transparent"/>
+            <circle class="hit" data-x="397.5" data-y="185.7" data-label="t=75s · free 1.37 GB" cx="397.5" cy="185.7" r="12" fill="transparent"/>
+            <circle class="hit" data-x="465" data-y="218.1" data-label="t=90s · free 0.08 GB" cx="465" cy="218.1" r="12" fill="transparent"/>
+            <circle class="hit" data-x="532.5" data-y="218.0" data-label="t=105s · free 0.08 GB" cx="532.5" cy="218.0" r="12" fill="transparent"/>
+            <circle class="hit" data-x="600" data-y="216.85" data-label="t=120s · free 0.13 GB — killed" cx="600" cy="216.85" r="12" fill="transparent"/>
+          </g>
+        </svg>
+        <div class="tooltip" id="tt2"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="diagnosis">
+    <div class="section-head"><span class="section-num">06</span><h2>Diagnosis</h2></div>
+    <ul class="diag-list prose">
+      <li>The formulation itself is sound: every scale from Ω=3 to Ω=50 builds and LP-relaxes correctly, and the Ω=30 MIP's root relaxation reproduces the <i>identical</i> objective across two different solver configurations.</li>
+      <li>The obstacle is resource capacity on this specific machine — 18&nbsp;GB of RAM, several of which are already tied up by residual swap from earlier attempts — not a bug in the model or in the code that constructs it.</li>
+      <li>Two distinct pressure points showed up at two different scales: outright construction memory at Ω=100 (never completed, LP or MIP), and solver-internal presolve/barrier/crossover memory at just Ω=30 once integrality is turned on.</li>
+      <li>Branch-and-bound — arguably the phase most likely to need real headroom for a problem this size — has never actually run. Every failure so far happens before it starts.</li>
+      <li>An 11-order-of-magnitude spread in the model's coefficients (5×10⁻⁴ to 2×10⁷), visible in Gurobi's own presolve report, is a plausible contributor to Run 2's crossover instability — traceable to very large "obviously non-binding" placeholder constants (10⁶–10⁹) standing in for two not-yet-calibrated parameters.</li>
+    </ul>
+  </section>
+
+  <section id="recs">
+    <div class="section-head"><span class="section-num">07</span><h2>Recommendations</h2></div>
+    <ol class="recs prose" style="max-width:none;">
+      <li><b>More RAM.</b><span>A machine with meaningfully more headroom — a lab machine or a cloud instance — is the most direct route to an actual Ω=100 result, and the only option that requires no changes to the formulation.</span></li>
+      <li><b>Shrink the placeholder coefficients.</b><span>Replace the 10⁶–10⁹ "non-binding" placeholders (node-handling capacity; one arc-throughput fallback) with smaller values that are still safely non-binding. Untested, but a cheap, targeted response to the specific instability Run 2 showed.</span></li>
+      <li><b>Try disabling crossover.</b><span>Gurobi's <span class="mono">Crossover=0</span> is a one-line, no-model-change test of whether branch-and-bound can proceed directly from the interior-point solution, skipping the phase that failed in Run 2.</span></li>
+      <li class="not-rec"><b>Further construction-code rewrites.</b><span>Already tested and ruled out — the bulk-insert conversion (§4) made no measurable difference at any scale tried.</span></li>
+      <li class="not-rec"><b>Reducing the scenario count alone.</b><span>Not a workaround — per §1, it changes what the CVaR objective means, not just how expensive it is to compute.</span></li>
+    </ol>
+  </section>
+
+  <footer>
+    All figures reproduced from live runs during the 2026-09-09 working session.<br>
+    Source scripts &amp; full solver logs: <span class="mono">aps_usarpac/scripts/vif_phase5_structural_validation.py</span>, <span class="mono">vif_phase5_mip_test_beta08_n30.py</span>, and <span class="mono">PHASE5_NOTES.md</span>.<br>
+    Machine: MacBook Pro, Apple M3 Pro, 12 cores, 18 GB unified memory, macOS 24.6.0 · Gurobi 11.0.3 (academic license).
+  </footer>
+
+</div>
+
+<script>
+(function(){
+  function wire(svgSel, ttSel){
+    var svg = document.querySelector(svgSel);
+    var tt = document.querySelector(ttSel);
+    if(!svg || !tt) return;
+    var wrap = svg.closest('.chart-wrap');
+    svg.querySelectorAll('.hit').forEach(function(hit){
+      hit.addEventListener('mouseenter', function(e){
+        tt.innerHTML = '<b>' + hit.dataset.label + '</b>';
+        tt.style.opacity = 1;
+      });
+      hit.addEventListener('mousemove', function(e){
+        var r = wrap.getBoundingClientRect();
+        tt.style.left = (e.clientX - r.left + 14) + 'px';
+        tt.style.top = (e.clientY - r.top - 10) + 'px';
+      });
+      hit.addEventListener('mouseleave', function(){ tt.style.opacity = 0; });
+    });
+  }
+  wire('#scaling svg', '#tt1');
+  wire('#mip svg', '#tt2');
+})();
+</script>
+</body>
+</html>

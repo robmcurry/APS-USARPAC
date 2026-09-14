@@ -1,0 +1,459 @@
+% =====================================================================
+% STANDALONE DROP-IN SECTION FOR OVERLEAF
+% =====================================================================
+% Individual (per-instance) vehicle-indexed formulation for air assets,
+% as implemented on the `individual-vehicle-indexing` branch
+% (model/model.py, solve_stochastic_cvar with vehicle_formulation="individual",
+% default flag configuration).
+%
+% This section is FULLY SELF-CONTAINED: it restates the sets, parameters,
+% variables, objective, and all shared constraints so it can be read without
+% flipping back to the aggregate formulation section. It is FORMULATION ONLY
+% (no computational/tractability results).
+%
+% IT STANDS ALONGSIDE the existing experimental section (paper 3.12,
+% "Individual Vehicle Indexing for Air Assets (Experimental)"). That earlier
+% section describes a SUPERSEDED version of the model; this section reflects
+% the current branch code. See the reconciliation remark at the end. Because
+% both sections coexist, EVERY label here is prefixed `...:vif:...` to avoid
+% clashing with the existing `eq:individualvehiclevar`, `eq:vehcons`,
+% `eq:objective`, etc. Do a find/replace on the prefix if you prefer another.
+%
+% Requires: amsmath, amssymb (\mathbb, \geq, etc.), bbm or \mathbb for the
+% indicator (uses \mathbb{1}); dsfont not required.
+%
+% NUMERIC PARAMETER VALUES (fleet sizes, speeds, degradation matrix, delta,
+% beta, etc.) are unchanged from the main formulation's parameter/vehicle
+% tables and are referenced, not duplicated, to avoid divergence between two
+% copies. The one compact vehicle-parameter recap table below is included for
+% readability; swap in \ref{}s to your existing tables if you prefer.
+% =====================================================================
+
+\section{Vehicle-Indexed Formulation for Air Assets (Complete)}
+\label{sec:vif}
+
+This section presents, in full and self-contained form, the extensive-form
+two-stage stochastic program with \emph{individual (per-instance) indexing of
+air-mode vehicles}. It supersedes the experimental sketch of
+Section~\ref{sec:individualvehicles} and reflects the current implementation.
+The aggregate formulation of Section~\ref{sec:formulation} remains the model
+used for the primary results; the model below is an extension that resolves
+the aggregate model's inability to distinguish one vehicle flying several legs
+from several vehicles each flying one, at the cost of a substantially larger
+integer program.
+
+Individual indexing is scoped to the air mode only. Let
+$K^{\mathrm{ind}} \subseteq K_{\mathrm{air}}$ denote the air-vehicle types
+carrying per-instance identity; in the current configuration
+$K^{\mathrm{ind}} = K_{\mathrm{air}} = \{\text{C-17}, \text{C-130J}\}$. Sea and
+land types, and any air type not in $K^{\mathrm{ind}}$, retain the aggregate
+integer-count representation unchanged. Vehicle identity is
+\emph{scenario-local}: instance $\ell \in \{1,\dots,F_k\}$ denotes a vehicle
+slot within a single scenario's realization, with no state carried across
+scenarios, consistent with treating $\Omega$ as independent draws in which the
+fleet begins each scenario at its base distribution.
+
+\subsection{Sets}
+\label{sec:vif:sets}
+
+\begin{itemize}
+  \item $N$: nodes, $|N| = 50$; $N^P \subseteq N$: PPL candidates, $|N^P| = 22$.
+  \item $R = \{\text{food}, \text{water}\}$: resource types.
+  \item $M = \{\text{sea}, \text{air}, \text{land}\}$: modes;
+        $A_m \subseteq N \times N$: directed arcs on mode $m$.
+  \item $T_i \subseteq M \times M$: feasible transfer mode-pairs at node $i$.
+  \item $\Omega$: scenarios (Sample Average Approximation sample).
+  \item $K_m$: vehicle types on mode $m$; $J_k \subseteq N^P$: basing-eligible
+        nodes for type $k$.
+  \item $K^{\mathrm{ind}} \subseteq K_{\mathrm{air}}$: air-vehicle types with
+        per-instance indexing; for $k \in K^{\mathrm{ind}}$, instances are
+        indexed $\ell \in \{1,\dots,F_k\}$.
+\end{itemize}
+
+\subsection{Parameters}
+\label{sec:vif:params}
+
+Demand $d^\omega_{ir}$; per-capita demand rate $\phi_r$; population $P_i$;
+inventory ceiling $\bar{q}_{ir}$; safety-stock fraction $\rho$; availability
+$a^\omega_{ir}\in\{0,1\}$; nominal and residual arc capacity $U_{m,ij,r}$,
+$u^\omega_{m,ij,r}$; per-unit transport cost $c_{m,ij}$; arc distance
+$\text{dist}_{ij}$; transfer capacity $\kappa_{i,m_1m_2}$ and cost multiplier
+$\theta_{m_1m_2}$; unmet-demand penalty $\delta_{ir}$; site count cap
+$P_{\max}$, activation cost $f_i$, selection budget $B$; CVaR confidence level
+$\beta$; scenario weight $\pi^\omega = 1/|\Omega|$; vehicle-movement
+tie-breaker $\varepsilon = 0.04$.
+
+Vehicle parameters (Table~\ref{tab:vif:params}): fleet size $F_k$; effective
+cruise speed $v_k$; distance budget $D_k = 3 v_k$ (the 72-hour window as three
+days of range); turnaround penalty
+$\psi_k = (\text{turnaround}_m / 24)\, v_k$; per-resource capacity
+$\text{cap}_{k,r}$; initial basing count $b_{k,j}$ with
+$\sum_{j} b_{k,j} = F_k$ and $b_{k,j} > 0 \Rightarrow j \in J_k \subseteq N^P$.
+
+\paragraph{Instance-to-home assignment.}
+For each individually-indexed type $k \in K^{\mathrm{ind}}$, the fleet's
+per-node basing counts $b_{k,j}$ are expanded deterministically into
+per-instance home assignments. Ordering the eligible base nodes and filling
+instances in sequence, define the fixed home node
+\begin{equation}
+\zeta(k,\ell) \in J_k \subseteq N^P,
+\qquad \ell \in \{1,\dots,F_k\},\ k \in K^{\mathrm{ind}},
+\label{eq:vif:home}
+\end{equation}
+so that exactly $b_{k,j}$ instances have $\zeta(k,\ell) = j$. Because
+$\sum_j b_{k,j} = F_k$, every instance receives exactly one home node, and
+$\zeta(k,\ell)$ is a parameter (not a decision variable). This is the
+per-instance refinement of the aggregate basing term $b_{k,j}\,p_j$.
+
+\begin{table}[t]
+\centering
+\caption{Vehicle parameters (numeric values as in the main formulation's
+vehicle table). Air types carry per-instance identity; sea/land are
+aggregate.}
+\label{tab:vif:params}
+\begin{tabular}{llrrrr}
+\hline
+Type & Mode & $F_k$ & $v_k$ (km/day) & $D_k = 3v_k$ & $\psi_k$ \\
+\hline
+C-17     & air  & 12 & 11{,}662 & 34{,}986 & (2/24)$\,v_k$ \\
+C-130J   & air  & 16 & 7{,}840  & 23{,}520 & (2/24)$\,v_k$ \\
+LCU-1700 & sea  & 8  & 408      & 1{,}224  & (6/24)$\,v_k$ \\
+M1083    & land & 60 & 1{,}116  & 3{,}348  & (1/24)$\,v_k$ \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{Decision Variables}
+\label{sec:vif:vars}
+
+\paragraph{First stage (here-and-now).}
+\begin{itemize}
+  \item $p_i \in \{0,1\}$, $i \in N^P$: $1$ if node $i$ is selected as a PPL.
+\end{itemize}
+
+\paragraph{Second stage (recourse, per scenario $\omega$).}
+\begin{itemize}
+  \item $x^\omega_{m,ijr} \geq 0$: commodity-$r$ flow on mode-$m$ arc $(i,j)$.
+  \item $\tau^\omega_{i,m_1m_2,r} \geq 0$: intermodal transfer of $r$ at node
+        $i$ from mode $m_1$ to $m_2$.
+  \item $z^\omega_{ir} \geq 0$: unmet demand of $r$ at node $i$.
+  \item $y^\omega_{ir} \geq 0$: inventory of $r$ released from site $i$.
+\end{itemize}
+
+\paragraph{Vehicle variables.}
+\begin{itemize}
+  \item $n^\omega_{k,m,ij} \in \mathbb{Z}_{\geq 0}$: aggregate type-$k$ vehicle
+        count on mode-$m$ arc $(i,j)$, for
+        $k \in K_m,\ m \in \{\text{sea},\text{land}\}$ and for any air type
+        $k \in K_{\mathrm{air}} \setminus K^{\mathrm{ind}}$. For
+        $k \in K^{\mathrm{ind}}$ the symbol $n^\omega_{k,\text{air},ij}$ is
+        retained but defined by the aggregation link
+        \eqref{eq:vif:agglink} rather than optimized directly.
+  \item $n^\omega_{k,\ell,\text{air},ij} \in \{0,1\}$: $1$ if instance $\ell$
+        of air type $k \in K^{\mathrm{ind}}$ traverses air arc $(i,j)$ in
+        scenario $\omega$.
+\end{itemize}
+
+\paragraph{Auxiliary variables.}
+\begin{itemize}
+  \item $\eta \in \mathbb{R}$: Value-at-Risk threshold; $\xi^\omega \geq 0$:
+        CVaR excess loss; $L^\omega \geq 0$: scenario loss.
+  \item $g^\omega_{k,j} \geq 0$: McCormick auxiliary linearizing the
+        $p_j$-coupled turnaround exemption for aggregate types
+        (\eqref{eq:vif:mccormick}).
+  \item $g^\omega_{k,\ell} \geq 0$: McCormick auxiliary linearizing the
+        home-node turnaround exemption for air instances
+        (\eqref{eq:vif:mccormickind}).
+\end{itemize}
+
+\subsection{Objective and Scenario Loss}
+\label{sec:vif:obj}
+
+The scenario loss aggregates the unmet-demand penalty, transport cost across
+all modal layers, intermodal transfer cost, and a small vehicle-movement
+tie-breaker:
+\begin{equation}
+L^\omega =
+\sum_{i \in N}\sum_{r \in R} \delta_{ir}\, z^\omega_{ir}
++ \sum_{m \in M}\sum_{(i,j) \in A_m}\sum_{r \in R} c_{m,ij}\, x^\omega_{m,ijr}
++ \sum_{i \in N}\sum_{(m_1,m_2) \in T_i}\sum_{r \in R}
+      \theta_{m_1m_2}\, \tau^\omega_{i,m_1m_2,r}
++ \varepsilon \sum_{k}\sum_{m \in M}\sum_{(i,j) \in A_m} n^\omega_{k,m,ij}.
+\label{eq:vif:loss}
+\end{equation}
+The final term ($\varepsilon = 0.04$) is a lexicographic tie-breaker,
+negligible against $\delta_{ir}$ and without influence on delivery decisions;
+it makes the solver strictly prefer fewer vehicle-arc traversals and no empty
+repositioning legs when delivery outcomes are identical. For air types the
+aggregate count $n^\omega_{k,\text{air},ij}$ appearing here equals
+$\sum_\ell n^\omega_{k,\ell,\text{air},ij}$ by \eqref{eq:vif:agglink}, so the
+tie-breaker counts individual instance movements consistently.
+
+The model minimizes the Conditional Value-at-Risk of the loss at confidence
+level $\beta$:
+\begin{equation}
+\min_{p,\,x,\,\tau,\,n,\,y,\,z,\,\eta,\,\xi,\,g}
+\quad
+\eta + \frac{1}{1-\beta} \sum_{\omega \in \Omega} \pi^\omega\, \xi^\omega .
+\label{eq:vif:objective}
+\end{equation}
+
+\subsection{Constraints}
+\label{sec:vif:constraints}
+
+\paragraph{First-stage selection.}
+\begin{align}
+\sum_{i \in N^P} p_i &\leq P_{\max}, \label{eq:vif:pmax} \\
+\sum_{i \in N^P} f_i\, p_i &\leq B, \label{eq:vif:budget} \\
+p_i &\in \{0,1\} \quad \forall i \in N^P. \label{eq:vif:binary}
+\end{align}
+(The theater-wide inventory ceiling of the aggregate formulation is likewise
+not imposed in the implementation and is omitted here; under $P_{\max}=3$ it
+would remain non-binding.)
+
+\paragraph{CVaR linearization (Rockafellar--Uryasev).}
+\begin{align}
+\xi^\omega &\geq L^\omega - \eta \quad \forall \omega \in \Omega,
+  \label{eq:vif:cvar1} \\
+\xi^\omega &\geq 0 \quad \forall \omega \in \Omega. \label{eq:vif:cvar2}
+\end{align}
+
+\paragraph{Inventory release.}
+\begin{align}
+y^\omega_{ir} &\leq (1-\rho)\, \bar{q}_{ir}\, a^\omega_{ir}\, p_i
+  \quad \forall i \in N^P,\ r \in R,\ \omega \in \Omega, \label{eq:vif:release} \\
+y^\omega_{ir} &= 0
+  \quad \forall i \in N \setminus N^P,\ r \in R,\ \omega \in \Omega.
+  \label{eq:vif:norelease}
+\end{align}
+
+\paragraph{Aggregate flow balance.}
+\begin{align}
+\sum_{m}\sum_{j:(j,i)\in A_m} x^\omega_{m,jir} + y^\omega_{ir} + z^\omega_{ir}
+  &= d^\omega_{ir} + \sum_{m}\sum_{j:(i,j)\in A_m} x^\omega_{m,ijr}
+  &&\forall i \in N^P,\ r,\ \omega, \label{eq:vif:balppl} \\
+\sum_{m}\sum_{j:(j,i)\in A_m} x^\omega_{m,jir} + z^\omega_{ir}
+  &= d^\omega_{ir} + \sum_{m}\sum_{j:(i,j)\in A_m} x^\omega_{m,ijr}
+  &&\forall i \in N \setminus N^P,\ r,\ \omega. \label{eq:vif:balnon}
+\end{align}
+
+\paragraph{Per-mode outbound feasibility with transfer.}
+\begin{align}
+\sum_{j:(i,j)\in A_m} x^\omega_{m,ijr}
+  + \sum_{m_2:(m,m_2)\in T_i} \tau^\omega_{i,mm_2,r}
+\;\leq\;&
+\sum_{j:(j,i)\in A_m} x^\omega_{m,jir}
+  + \sum_{m_1:(m_1,m)\in T_i} \tau^\omega_{i,m_1m,r}
+  + \mathbb{1}[i \in N^P]\, y^\omega_{ir} \notag \\
+&\forall i \in N,\ m \in M,\ r \in R,\ \omega \in \Omega. \label{eq:vif:permode}
+\end{align}
+
+\paragraph{Transfer backing.}
+\begin{equation}
+\sum_{m_2:(m,m_2)\in T_i} \tau^\omega_{i,mm_2,r}
+\;\leq\;
+\sum_{j:(j,i)\in A_m} x^\omega_{m,jir}
+  + \mathbb{1}[i \in N^P]\, y^\omega_{ir}
+\quad \forall i,\ m,\ r,\ \omega.
+\label{eq:vif:transferbacking}
+\end{equation}
+
+\paragraph{Capacity.}
+\begin{align}
+x^\omega_{m,ijr} &\leq u^\omega_{m,ij,r}
+  \quad \forall m,\ (i,j) \in A_m,\ r,\ \omega, \label{eq:vif:arccap} \\
+\sum_{r \in R} \tau^\omega_{i,m_1m_2,r} &\leq \kappa_{i,m_1m_2}
+  \quad \forall i,\ (m_1,m_2) \in T_i,\ \omega. \label{eq:vif:transfercap}
+\end{align}
+
+\paragraph{Aggregate vehicle conservation (sea, land, non-indexed air).}
+For every aggregate type --- $k \in K_m$ with $m \in \{\text{sea},\text{land}\}$,
+and $k \in K_{\mathrm{air}} \setminus K^{\mathrm{ind}}$ --- a vehicle may depart
+a node only if present there through activated basing or prior arrival:
+\begin{equation}
+\sum_{i:(i,j)\in A_m} n^\omega_{k,m,ij} + b_{k,j}\, p_j
+\;\geq\;
+\sum_{j':(j,j')\in A_m} n^\omega_{k,m,jj'}
+\quad \forall j \in N,\ m,\ \omega.
+\label{eq:vif:vehcons}
+\end{equation}
+No separate fleet-cardinality constraint is imposed: vehicles are injected
+into the flow only at base nodes via $b_{k,j}\,p_j$, so
+\eqref{eq:vif:vehcons} together with the distance budget
+\eqref{eq:vif:distbudget} bounds fleet usage without capping traversals.
+
+\paragraph{Air aggregation link.}
+For each individually-indexed air type, the aggregate count is recovered as a
+sum over instances, so the vehicle-capacity constraint
+\eqref{eq:vif:vehcap} needs no modification:
+\begin{equation}
+n^\omega_{k,\text{air},ij} = \sum_{\ell=1}^{F_k} n^\omega_{k,\ell,\text{air},ij}
+\quad \forall k \in K^{\mathrm{ind}},\ (i,j) \in A_{\text{air}},\ \omega.
+\label{eq:vif:agglink}
+\end{equation}
+
+\paragraph{Per-instance conservation (air).}
+For each air instance $\ell$, departures from a node are backed only by
+arrivals of that same instance or, at its home node, by basing coupled to site
+selection:
+\begin{equation}
+\sum_{i:(i,j)\in A_{\text{air}}} n^\omega_{k,\ell,\text{air},ij}
+  + \mathbb{1}\!\left[\zeta(k,\ell)=j\right] p_j
+\;\geq\;
+\sum_{j':(j,j')\in A_{\text{air}}} n^\omega_{k,\ell,\text{air},jj'}
+\quad \forall k \in K^{\mathrm{ind}},\ \ell,\ j \in N,\ \omega.
+\label{eq:vif:indvehcons}
+\end{equation}
+This is the sole constraint coupling a specific air instance's availability to
+the first-stage decision, through the term
+$\mathbb{1}[\zeta(k,\ell)=j]\,p_j$.
+
+\paragraph{Vehicle-capacity-constrained flow.}
+Flow on an arc is bounded by the per-resource capacity of the vehicles
+committed to it, using the aggregate count on every mode (with air's count
+supplied by \eqref{eq:vif:agglink}):
+\begin{equation}
+x^\omega_{m,ijr} \;\leq\; \sum_{k \in K_m} \text{cap}_{k,r}\, n^\omega_{k,m,ij}
+\quad \forall m,\ (i,j) \in A_m,\ r,\ \omega.
+\label{eq:vif:vehcap}
+\end{equation}
+
+\paragraph{Fleet-wide distance budget (aggregate types).}
+For each aggregate type $k$ with mode $m$, total distance flown plus turnaround
+penalties on non-exempt outbound flow cannot exceed the fleet's aggregate
+budget $F_k D_k$:
+\begin{equation}
+\sum_{(i,j)\in A_m} \text{dist}_{ij}\, n^\omega_{k,m,ij}
++ \psi_k \Bigg( \sum_{j \in N} \sum_{j':(j,j')\in A_m} n^\omega_{k,m,jj'}
+  \;-\; \sum_{j \in J_k} g^\omega_{k,j} \Bigg)
+\;\leq\; F_k\, D_k
+\quad \forall k \notin K^{\mathrm{ind}},\ \omega.
+\label{eq:vif:distbudget}
+\end{equation}
+The turnaround exemption applies only at base nodes that are actually selected;
+because it depends on the product of outbound flow and the first-stage binary
+$p_j$, it is linearized by the McCormick envelope
+\begin{align}
+g^\omega_{k,j} &\leq F_k\, p_j, \label{eq:vif:mccormick} \\
+g^\omega_{k,j} &\leq \sum_{j':(j,j')\in A_m} n^\omega_{k,m,jj'}, \notag \\
+g^\omega_{k,j} &\geq \sum_{j':(j,j')\in A_m} n^\omega_{k,m,jj'} - F_k\,(1 - p_j),
+  \quad g^\omega_{k,j} \geq 0,
+  \qquad \forall j \in J_k,\ \omega, \notag
+\end{align}
+which is exact because $p_j$ is binary.
+
+\paragraph{Per-instance distance budget (air).}
+Each air instance is held to a single-vehicle budget $D_k$ (not $F_k D_k$):
+\begin{equation}
+\sum_{(i,j)\in A_{\text{air}}} \text{dist}_{ij}\, n^\omega_{k,\ell,\text{air},ij}
++ \psi_k \Bigg( \sum_{j \in N} \sum_{j':(j,j')\in A_{\text{air}}}
+      n^\omega_{k,\ell,\text{air},jj'}
+  \;-\; g^\omega_{k,\ell} \Bigg)
+\;\leq\; D_k
+\quad \forall k \in K^{\mathrm{ind}},\ \ell,\ \omega.
+\label{eq:vif:indvehdistbudget}
+\end{equation}
+Because an instance has a single fixed home node $\zeta(k,\ell)$, the
+turnaround exemption has exactly one candidate node and its McCormick envelope
+uses a constant bound of $1$:
+\begin{align}
+g^\omega_{k,\ell} &\leq p_{\zeta(k,\ell)}, \label{eq:vif:mccormickind} \\
+g^\omega_{k,\ell} &\leq \sum_{j':(\zeta(k,\ell),j')\in A_{\text{air}}}
+      n^\omega_{k,\ell,\text{air},\zeta(k,\ell)j'}, \notag \\
+g^\omega_{k,\ell} &\geq \sum_{j':(\zeta(k,\ell),j')\in A_{\text{air}}}
+      n^\omega_{k,\ell,\text{air},\zeta(k,\ell)j'} - \bigl(1 - p_{\zeta(k,\ell)}\bigr),
+  \quad g^\omega_{k,\ell} \geq 0,
+  \qquad \forall k \in K^{\mathrm{ind}},\ \ell,\ \omega. \notag
+\end{align}
+
+\paragraph{Rooted subtour elimination (air).}
+Per-instance conservation \eqref{eq:vif:indvehcons} alone does not prevent an
+instance's active arcs from forming a cycle disconnected from its home node: a
+closed loop $j_1 \to j_2 \to \dots \to j_1$ touching no home node satisfies
+conservation locally (one arrival and one departure at each node) while
+consuming no basing credit. Such phantom cycles are excluded by the family of
+rooted subtour-elimination constraints: for every instance, no node subset
+excluding its home may contain a full internal cycle,
+\begin{equation}
+\sum_{\substack{(i,j)\in A_{\text{air}}\\ i \in S,\ j \in S}}
+  n^\omega_{k,\ell,\text{air},ij}
+\;\leq\; |S| - 1
+\quad
+\forall k \in K^{\mathrm{ind}},\ \ell,\ \omega,\
+\forall S \subseteq N \setminus \{\zeta(k,\ell)\},\ |S| \geq 2.
+\label{eq:vif:sec}
+\end{equation}
+A legitimate route from the home node traverses any such subset $S$ as an
+acyclic path, using at most $|S|-1$ internal arcs, and is never cut; a
+disconnected cycle within $S$ uses $|S|$ internal arcs and is removed. This
+family is exponentially large and is not imposed a priori. It is separated
+lazily within branch-and-cut (Dantzig--Fulkerson--Johnson): at each
+integer-feasible incumbent, a routine computes, for every $(k,\ell,\omega)$,
+the set of nodes reachable from $\zeta(k,\ell)$ along that incumbent's active
+air arcs; each maximal group of active arcs touching only unreached nodes
+identifies a violated subset $S$, whose constraint \eqref{eq:vif:sec} is added
+as a lazy cut.
+
+\paragraph{Instance symmetry breaking (air).}
+Instances of the same air type sharing a home node are interchangeable
+(identical $D_k$, $\psi_k$, $\text{cap}_{k,r}$, and home), differing only by
+label. To remove the resulting permutation symmetry, instances within each
+$(k, \text{home})$ group are ordered by total outbound arc count. Let
+$H^\omega_{k,\ell} = \sum_{j\in N}\sum_{j':(j,j')\in A_{\text{air}}}
+n^\omega_{k,\ell,\text{air},jj'}$ denote instance $\ell$'s total outbound air
+flow; then, for consecutive instances $\ell, \ell+1$ with
+$\zeta(k,\ell) = \zeta(k,\ell+1)$,
+\begin{equation}
+H^\omega_{k,\ell} \;\leq\; H^\omega_{k,\ell+1}
+\quad \forall k \in K^{\mathrm{ind}},\ \omega .
+\label{eq:vif:symbreak}
+\end{equation}
+Relabeling instances within an interchangeable group to satisfy this ordering
+changes nothing else, so at least one optimum always satisfies it. The
+ordering is scoped strictly within same-home groups: instances at different
+home nodes are structurally distinguishable and are never constrained against
+one another.
+
+\paragraph{Nonnegativity and integrality.}
+\begin{align}
+z^\omega_{ir},\ y^\omega_{ir},\ x^\omega_{m,ijr},\
+  \tau^\omega_{i,m_1m_2,r},\ g^\omega_{k,j},\ g^\omega_{k,\ell},\ \xi^\omega
+  &\geq 0, \label{eq:vif:nonneg} \\
+n^\omega_{k,m,ij} &\in \mathbb{Z}_{\geq 0}
+  \quad (k \notin K^{\mathrm{ind}}), \label{eq:vif:int} \\
+n^\omega_{k,\ell,\text{air},ij} &\in \{0,1\}
+  \quad (k \in K^{\mathrm{ind}}), \label{eq:vif:bin} \\
+\eta &\in \mathbb{R}. \label{eq:vif:etafree}
+\end{align}
+
+\subsection{Modeling Remarks}
+\label{sec:vif:remarks}
+
+\paragraph{Relationship to the experimental section.}
+This formulation supersedes the sketch of
+Section~\ref{sec:individualvehicles}. Two differences are substantive rather
+than presentational. First, the mechanism preventing disconnected phantom
+cycles is the lazily-separated subtour family \eqref{eq:vif:sec}, not a static
+single-departure constraint. An alternative static formulation --- a per-node
+departure-indicator binary with at most one active departure node per instance
+--- is present in the implementation but disabled by default, because it cannot
+simultaneously permit multi-leg routing and exclude disconnected cycles;
+constraint \eqref{eq:vif:sec} does both. Second, the per-instance turnaround
+exemption \eqref{eq:vif:mccormickind} is stated here with its correct McCormick
+envelope, which the earlier section omitted.
+
+\paragraph{Single-sortie-from-home.}
+Because the exemption envelope \eqref{eq:vif:mccormickind} uses a constant
+bound of $1$, when an instance's home node is selected the envelope forces its
+home-node outbound flow to at most one arc; each air instance therefore
+departs its home node at most once per scenario. This is a modeling
+restriction of the present formulation (it excludes a within-scenario
+return-refuel-relaunch from the home base), accepted here as consistent with
+the single-response-window interpretation of a scenario.
+
+\paragraph{Symmetry safety versus the aggregate model.}
+The aggregate formulation of Section~\ref{sec:formulation} is symmetry-safe by
+construction because same-type vehicles are never individuated. Individual
+indexing reintroduces permutation symmetry, which \eqref{eq:vif:symbreak}
+partially removes; residual symmetry among tied instances remains and is left
+to the solver.

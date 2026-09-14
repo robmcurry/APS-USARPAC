@@ -34,6 +34,8 @@ from typing import Dict, Any, Tuple, List
 import gurobipy as gp
 from gurobipy import GRB
 
+from model.model_vif import solve_vif
+
 
 def _build_subtour_callback(
     n_ind: Dict,
@@ -229,7 +231,13 @@ def solve_stochastic_cvar(
             n^omega_{k,l,m,ij} for air-mode k in {C-17, C-130J} only; sea,
             land, and any other air type still use the aggregate n
             unconditionally. Callers that don't pass this at all get
-            "aggregate", i.e. current behavior.
+            "aggregate", i.e. current behavior. "vif" (Phase 1 skeleton
+            only -- see docs/PRSVIF_Gospel.md and model_vif.solve_vif) builds
+            PRS-VIF: individually indexed vehicles across all modes with
+            basing as a joint first-stage decision, a single deterministic
+            scenario, and no CVaR/distance-budget/subtour/degradation
+            machinery yet (those land in later phases). Any other value
+            raises ValueError.
         _debug_skip_departure_single_node: When True (default) and
             vehicle_formulation="individual", the static DepartureSingleNode/
             DepartureNodeLink constraints (5) are NOT built. Subtour
@@ -379,6 +387,29 @@ def solve_stochastic_cvar(
 
     # p[i] - first-stage binary, unchanged from pre-Step-3
     p = model.addVars(PPL, vtype=GRB.BINARY, name="p")
+
+    # --- vif branch: PRS-VIF (docs/PRSVIF_Gospel.md), implemented in the
+    # separate model_vif.py module (not inline here) because PRS-VIF's math
+    # has no analog for the mode-indexed x/tau or the "release" decision
+    # variable built unconditionally below -- see model_vif.solve_vif's
+    # docstring, and PHASE1_NOTES.md's "Deviation from the dispatch-point
+    # framing". Diverges here, before any aggregate/individual variable is
+    # built. Does not touch anything past this point for "aggregate" or
+    # "individual"; an unrecognized formulation string still falls through
+    # to the ValueError below (line ~460), unchanged. ---
+    if vehicle_formulation == "vif":
+        return solve_vif(
+            model=model, instance=instance, p=p,
+            N=N, PPL=PPL, PPL_set=PPL_set, R=R, Omega=Omega, modes=modes,
+            modal_arcs=modal_arcs, modal_incoming=modal_incoming,
+            modal_outgoing=modal_outgoing, modal_arc_cost=modal_arc_cost,
+            vehicle_types=vehicle_types, demand=demand, penalty=penalty,
+            inventory_if_open=inventory_if_open,
+            releasable_fraction=releasable_fraction, site_cost=site_cost,
+            selection_budget=selection_budget, P_max=P_max,
+            beta=beta, prob=prob,
+            build_only=build_only, verbose=verbose,
+        )
 
     # x[w,m,i,j,r] - second-stage continuous flow of commodity r on mode-m
     # arc (i,j) in scenario w; indexed only over existing mode-arc combos

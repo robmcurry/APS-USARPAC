@@ -1,13 +1,13 @@
 """
 input_builder.py
 
-Second stage of the pipeline (scenarios -> stochastic instance -> gurobi
+second stage of the pipeline (scenarios -> stochastic instance -> gurobi
 model). Takes the raw scenario draws from scenarios/scenario_generator.py plus
 the node table and yaml parameters, and turns them into every set/parameter the
 gurobi model in model/model.py needs (arcs, demand, inventory,
 costs, capacities, probabilities).
 
-This file assumes:
+assumptions:
 - scenarios contain only exogenous disaster realization data
 - demand is fixed across scenarios
 - inventory is fixed across scenarios
@@ -15,17 +15,9 @@ This file assumes:
 - residual arc capacity varies by scenario through the degradation matrix
   scaled by alpha (uniform) or mode_alphas (per-mode override)
 
-Unit convention:
+unit convention:
 - 1 unit of any commodity = 1 person-day of support
   (e.g. demand of 100 units = enough food/water for 100 people for 1 day)
-
-Step 4 changes:
-- Removed: build_directed_arcs, build_arc_cost, build_nominal_arc_capacity,
-  build_residual_arc_capacity (all deprecated since Step 3)
-- Removed: deprecated backward-compat instance keys (arcs, arc_cost,
-  nominal_arc_capacity, residual_arc_capacity, gamma scalar)
-- Added: alpha and mode_alphas parameters to build_modal_residual_capacity
-- Added: alpha, mode_alphas, forced_type parameters to build_stochastic_instance
 """
 
 import warnings
@@ -36,7 +28,7 @@ from network.network_builder import load_sea_arcs, load_air_arcs, load_land_arcs
 
 def build_modal_arcs() -> Tuple[Dict, Dict, Dict, Dict]:
     """
-    Load the three modal arc layers (sea, air, land) from the network CSVs
+    load all three modal arc layers (sea, air, land) from the network CSVs
     produced by network/build_modal_arcs.py.
 
     Returns a 4-tuple:
@@ -526,6 +518,7 @@ def build_vehicle_params(
             "D_k": 3.0 * cruise_speed,
             "pi_k": (turnaround_hours / 24.0) * cruise_speed,
             "cruise_speed_km_day": cruise_speed,
+            "cap_tons": float(vconfig["payload_kg"]) / 1000.0,
         }
         K_m[mode].append(vtype_name)
 
@@ -533,6 +526,75 @@ def build_vehicle_params(
         "vehicle_types": vehicle_types,
         "K_m": K_m,
     }
+
+
+def build_resource_weight(params: Dict) -> Dict[str, float]:
+    """
+    w_r for PRS-VIF (model_vif.py's solve_vif): metric tons per unit
+    (person-day) of resource r -- eq:vif:vehcap's w_r, used to weigh
+    resource flow against a vehicle's raw metric-ton payload cap_l.
+
+    Reuses config["modal_capacity"]["maritime"]["pd_per_mt"] (identical
+    across all three modes in the config -- sea/air/terrestrial all carry
+    the same Sphere/WFP-basis pd_per_mt block) as its reciprocal:
+    w_r = 1 / pd_per_mt[r]. This matches the gospel's own stated Table 5
+    values exactly: w_food = 1/1852 = 5.4e-4, w_water = 1/66.7 ~= 1.5e-2
+    (both MT per person-day) -- not an independent calibration, just the
+    existing pd_per_mt data read the other way around.
+    """
+    pd_per_mt = params["modal_capacity"]["maritime"]["pd_per_mt"]
+    return {r: 1.0 / float(rate) for r, rate in pd_per_mt.items()}
+
+
+def build_nominal_throughput(params: Dict) -> Dict[str, Dict[Tuple[int, int], float]]:
+    """
+    T_m,ij for PRS-VIF (solve_vif): per-vehicle-TRIP nominal arc
+    throughput in metric tons -- eq:residual's T_{m,ij}, used in
+    eq:vif:vehcap as min{T^w_l,ij, cap_l} to cap each vehicle's own
+    arc use independently.
+
+    Deliberately NOT modal_capacity (U_food/U_water, from the arc CSV
+    columns): those bake in a fleet-size assumption (n_assets) belonging
+    to the aggregate/individual paths' pooled-arc model. Applying it here
+    would double-count capacity PRS-VIF already tracks via n[w,l,i,j] and
+    cap_l. The paper derives T from per-unit rates (vessel discharge,
+    sortie throughput, road ratings), not fleet totals. Full reasoning:
+    PHASE5_NOTES.md, "Deriving nominal_throughput without n_assets"
+    (confirmed with user before implementing).
+
+    Reads arc CSVs via load_{sea,air,land}_arcs() purely for their
+    vessel_type/aircraft_type columns; does not modify the CSVs or
+    network/build_modal_arcs.py.
+    """
+    cfg = params["modal_capacity"]
+    result: Dict[str, Dict[Tuple[int, int], float]] = {"sea": {}, "air": {}, "land": {}}
+
+    sea_cfg = cfg["maritime"]
+    for row in load_sea_arcs():
+        i, j = int(row["from_node"]), int(row["to_node"])
+        vessel_type = str(row["vessel_type"])
+        result["sea"][(i, j)] = sea_cfg["discharge_mt_per_window"].get(vessel_type, 0.0)
+
+    air_cfg = cfg["air"]
+    for row in load_air_arcs():
+        i, j = int(row["from_node"]), int(row["to_node"])
+        aircraft_type = str(row["aircraft_type"])
+        if aircraft_type == "none":
+
+            result["air"][(i, j)] = 1.0e6
+        else:
+            result["air"][(i, j)] = (
+                air_cfg["payload_mt"].get(aircraft_type, 0.0)
+                * air_cfg["sorties_per_window"].get(aircraft_type, 0.0)
+            )
+
+    land_cfg = cfg["terrestrial"]
+    for row in load_land_arcs():
+        i, j = int(row["from_node"]), int(row["to_node"])
+
+        result["land"][(i, j)] = float(row["total_mt_per_day"]) * land_cfg["window_days"]
+
+    return result
 
 
 def build_stochastic_instance(
@@ -571,9 +633,7 @@ def build_stochastic_instance(
 
     returns the instance dict (keys documented in-line below)
     """
-    # D2 audit fix: legacy arguments are absorbed for signature compatibility,
-    # but silently ignoring a non-empty one (e.g. gamma=0.5) lets a caller
-    # believe it parameterized the instance when it did nothing. Warn loudly.
+
     _swallowed = sorted(k for k, v in _kwargs.items() if v is not None)
     if _swallowed:
         warnings.warn(
@@ -612,6 +672,31 @@ def build_stochastic_instance(
 
     # --- Vehicle heterogeneity ---
     vehicle_data = build_vehicle_params(locations, params)
+
+
+    vif_resource_weight = build_resource_weight(params)
+    vif_nominal_throughput = build_nominal_throughput(params)
+
+
+    vif_node_severity = {
+        (int(scenario["scenario_id"]), i): float(scenario["node_severity"].get(i, 0.0))
+        for scenario in scenarios
+        for i in nodes
+    }
+    vif_disaster_type = {
+        int(scenario["scenario_id"]): scenario["disaster_type"]
+        for scenario in scenarios
+    }
+    vif_degradation_matrix = params.get("degradation_matrix", {})
+
+
+    _VIF_THETA_PLACEHOLDER = 1.0e4
+    vif_node_handling_capacity = {
+        (i, m): _VIF_THETA_PLACEHOLDER for i in nodes for m in modes
+    }
+    vif_node_handling_bonus = {
+        (i, m): _VIF_THETA_PLACEHOLDER for i in ppl_nodes for m in modes
+    }
 
     # --- Demand / inventory / cost parameters ---
     demand = build_fixed_demand(locations, commodities, scenarios, params)
@@ -653,6 +738,14 @@ def build_stochastic_instance(
         "transfer_cost": transfer_cost,
         "vehicle_types": vehicle_data.get("vehicle_types", {}),
         "K_m": vehicle_data.get("K_m", {"sea": [], "air": [], "land": []}),
+        # --- PRS-VIF (model_vif.py's solve_vif) schema ---
+        "resource_weight": vif_resource_weight,
+        "nominal_throughput": vif_nominal_throughput,
+        "node_severity": vif_node_severity,
+        "disaster_type": vif_disaster_type,
+        "degradation_matrix": vif_degradation_matrix,
+        "node_handling_capacity": vif_node_handling_capacity,
+        "node_handling_bonus": vif_node_handling_bonus,
         # --- Stochastic parameters ---
         "probability": probability,
         "demand": demand,

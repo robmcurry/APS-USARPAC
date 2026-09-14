@@ -537,7 +537,7 @@ translation, or licensing grounds.
 
 Epicenter countries are drawn from a multinomial with weights
 $$\begin{equation}
-w_c = \frac{n_c}{\sum_{c' \in C} n_{c'}},
+w_c = \frac{n_c}{\sum_{c \in C} n_{c}},
 \label{eq:countryweights}
 \end{equation}$$ where $n_c$ is the recorded event count for country
 $c$. Table [3](#tab:weights){reference-type="ref"
@@ -746,17 +746,24 @@ node is constrained by that node's condition regardless of the far end
 
 - $d^\omega_{ir}$: demand
   (Eq. [\[eq:demand\]](#eq:demand){reference-type="ref"
-  reference="eq:demand"}); $\phi_r$: per-capita demand rate; $P_i$:
-  population
+  reference="eq:demand"});
 
-- $\bar{q}_{ir}$: inventory ceiling at $i$ if activated; $\rho$:
-  safety-stock fraction; $a^\omega_{ir} \in \{0,1\}$: availability
-  factor, 0 if $s^\omega_i$ reaches the cutoff severity
+- $\phi_r$: per-capita demand rate;
+
+- $P_i$: population
+
+- $\bar{q}_{ir}$: inventory ceiling at $i$ if activated;
+
+- $\rho$: safety-stock fraction;
+
+- $a^\omega_{ir} \in \{0,1\}$: availability factor, 0 if $s^\omega_i$
+  reaches the cutoff severity
 
 - $U_{m,ij,r}$, $u^\omega_{m,ij,r}$: nominal and residual arc capacity
   (Eqs. [\[eq:residual\]](#eq:residual){reference-type="ref"
-  reference="eq:residual"}); $c_{m,ij}$: per-unit transport cost;
-  $\text{dist}_{ij}$: arc distance
+  reference="eq:residual"});
+
+- $c_{m,ij}$: per-unit transport cost; $\text{dist}_{ij}$: arc distance
 
 - $\kappa_{i,m_1m_2}$: node-specific transfer capacity;
   $\theta_{m_1m_2}$: network-wide transfer cost multiplier
@@ -922,10 +929,10 @@ at node $j$, exempted only at nodes that are both basing-eligible and
 where $b_{k,j} > 0$. Because $p_j$ is a first-stage binary, the product
 of outbound flow and $p_j$ is linearized with a McCormick envelope (an
 auxiliary variable $g^\omega_{k,j}$ and three bounding constraint
-families), ensuring the turnaround waiver applies only at nodes the
-model has actually activated. Charging the penalty on all non-exempt
-outbound flow is a conservative linear approximation of exact
-intermediate-stop counting.
+types), ensuring the turnaround waiver applies only at nodes the model
+has actually activated. Charging the penalty on all non-exempt outbound
+flow is a conservative linear approximation of exact intermediate-stop
+counting.
 
 *Nonnegativity and integrality.* $$\begin{align}
 z^\omega_{ir},\, y^\omega_{ir} &\geq 0 \label{eq:nonneg1} \\
@@ -999,16 +1006,16 @@ scenarios unequally on top of non-uniform sampling would double-count
 the calibration.
 
 With the vehicle extension active, the extensive form includes the
-integer vehicle-count family $n^\omega_{k,m,ij}$ and four additional
-constraint families (vehicle conservation, vehicle-capacity flow,
-distance budget with McCormick linearization, and transfer backing) in
-every scenario. Solve times at a 1 percent MIP gap are on the order of
-five minutes per instance on single-machine hardware, compared with
-7--12 seconds for the earlier formulation without vehicle constraints;
-final reporting runs use a 0.01 percent gap, at roughly 30 minutes per
-instance, which eliminates residual low-cost circular flows that survive
-within a looser gap tolerance. A time limit of 3,600 seconds per solve
-is imposed as a safeguard.
+integer vehicle-count $n^\omega_{k,m,ij}$ and four additional constraint
+types (vehicle conservation, vehicle-capacity flow, distance budget with
+McCormick linearization, and transfer backing) in every scenario. Solve
+times at a 1 percent MIP gap are on the order of five minutes per
+instance on single-machine hardware, compared with 7--12 seconds for the
+earlier formulation without vehicle constraints; final reporting runs
+use a 0.01 percent gap, at roughly 30 minutes per instance, which
+eliminates residual low-cost circular flows that survive within a looser
+gap tolerance. A time limit of 3,600 seconds per solve is imposed as a
+safeguard.
 
 **Convergence analysis.**
 
@@ -1021,6 +1028,257 @@ read by one loader, so capability thresholds, degradation values,
 vehicle specifications, and calibration constants can be adjusted
 without code changes.
 
+## Problem Scope and Instance Size {#sec:problemscope}
+
+This section documents the size of the extensive-form instance actually
+solved, with every quantity traceable either to a direct count of the
+input data or to a live dump of the Gurobi model object
+(`model.NumVars`, `model.NumConstrs`), rather than to a formula applied
+by hand. Reporting both the derivation and the ground-truth count serves
+two purposes: it makes the instance size independently verifiable, and
+it isolates exactly where implementation detail (auxiliary linearization
+variables, code-only bookkeeping terms) adds to the count beyond what
+the formulation in Section [3.8](#sec:formulation){reference-type="ref"
+reference="sec:formulation"} specifies.
+
+### Set Sizes
+
+::: {#tab:setsizes}
+  Set                                                                   Size
+  ---------------------------------------------------------------- ---------
+  $|N|$ (all nodes)                                                       50
+  $|N^P|$ (PPL candidates)                                                22
+  $|A_{\text{sea}}|$                                                     236
+  $|A_{\text{air}}|$                                                   1,502
+  $|A_{\text{land}}|$                                                     30
+  $|\Omega|$ (scenarios)                                                 100
+  $|K_{\text{sea}}|,\ |K_{\text{air}}|,\ |K_{\text{land}}|$          1, 2, 1
+  $\sum_i |T_i|$ (active transfer mode-pairs, summed over nodes)         106
+
+  : Set sizes for the reported instance (seed 32, $\alpha=1.0$).
+:::
+
+### Decision Variables
+
+Table [7](#tab:varsizes){reference-type="ref" reference="tab:varsizes"}
+reports each variable count alongside the formula that produces it. Two
+types exist in the implementation with no corresponding dissertation
+symbol: `loss`, a per-scenario bookkeeping convenience equal to
+$L^\omega$, and $g_{\text{turn}}$, the auxiliary variable introduced by
+the McCormick linearization of the $p_j$-coupled turnaround exemption in
+Equation [\[eq:distbudget\]](#eq:distbudget){reference-type="ref"
+reference="eq:distbudget"}. Both are included so the table reconciles
+exactly against the model's true variable count.
+
+::: {#tab:varsizes}
+  Type                               Symbol                      Count Scales as
+  ---------------------------------- ------------------- ------------- -----------------------------------------
+  Site selection                     $p$                            22 $|N^P|$
+  Modal flow                         $x$                       353,600 $\left(\sum_m|A_m|\right)|R||\Omega|$
+  Unmet demand                       $z$                        10,000 $|N||R||\Omega|$
+  Inventory release                  $y$                        10,000 $|N||R||\Omega|$
+  Intermodal transfer                $\tau$                     21,200 $\left(\sum_i|T_i|\right)|R||\Omega|$
+  Vehicle count                      $n$                       327,000 $\left(\sum_k|A_{m(k)}|\right)|\Omega|$
+  CVaR threshold                     $\eta$                          1 scalar
+  CVaR excess loss                   $\xi$                         100 $|\Omega|$
+  Loss (code-only)                   $L$                           100 $|\Omega|$
+  Turnaround auxiliary (code-only)   $g_{\text{turn}}$           3,400 McCormick linearization
+  **Total**                                                **725,423** matches `model.NumVars`
+
+  : Decision variable counts.
+:::
+
+Two types dominate the instance: $x$ and $n$ together account for
+680,600 of 725,423 variables (93.8 percent), and both are indexed by
+scenario. The vehicle-count $n$ is entirely integer. This is the central
+driver of solve difficulty reported in
+Section [3.11](#sec:computation){reference-type="ref"
+reference="sec:computation"}: the great majority of the model's size is
+not a fixed structural cost but a direct multiple of $|\Omega|$, and
+nearly half of that scenario-indexed mass is combinatorial rather than
+continuous.
+
+The release variable $y$ is defined over all of $N$ (50 nodes), not only
+$N^P$ (22);
+Equation [\[eq:norelease\]](#eq:norelease){reference-type="ref"
+reference="eq:norelease"} separately forces $y^\omega_{ir}=0$ for
+$i \notin N^P$. Restricting the variable's meaningful support through a
+zeroing constraint rather than through its domain is a standard modeling
+convenience, paid for here as 5,600 constraints that are individually
+trivial ($y=0$) but numerous.
+
+### Constraints
+
+Table [8](#tab:constraintsizes){reference-type="ref"
+reference="tab:constraintsizes"} reports the same treatment for
+constraint types, bucketed by the model's internal naming convention and
+reconciled against `model.NumConstrs`.
+
+::: {#tab:constraintsizes}
+  Type                                                Count Formulation reference
+  ------------------------------------------- ------------- ------------------------------------------------------------------------------------------------------------------------------------------------------
+  Site count / selection budget                           2 Eq. [\[eq:pmax\]](#eq:pmax){reference-type="ref" reference="eq:pmax"}, [\[eq:budget\]](#eq:budget){reference-type="ref" reference="eq:budget"}
+  Inventory release bound                             4,400 Eq. [\[eq:release\]](#eq:release){reference-type="ref" reference="eq:release"}
+  Non-PPL release zero                                5,600 Eq. [\[eq:norelease\]](#eq:norelease){reference-type="ref" reference="eq:norelease"}
+  Flow balance (PPL + non-PPL)                       10,000 Eq. [\[eq:balppl\]](#eq:balppl){reference-type="ref" reference="eq:balppl"}, [\[eq:balnon\]](#eq:balnon){reference-type="ref" reference="eq:balnon"}
+  Modal outbound feasibility                         30,000 Eq. [\[eq:permode\]](#eq:permode){reference-type="ref" reference="eq:permode"}
+  Arc capacity                                      353,600 Eq. [\[eq:arccap\]](#eq:arccap){reference-type="ref" reference="eq:arccap"}
+  Transfer backing                                   14,600 Eq. [\[eq:transferbacking\]](#eq:transferbacking){reference-type="ref" reference="eq:transferbacking"}
+  Transfer capacity                                  10,600 Eq. [\[eq:transfercap\]](#eq:transfercap){reference-type="ref" reference="eq:transfercap"}
+  Vehicle conservation                               20,000 Eq. [\[eq:vehcons\]](#eq:vehcons){reference-type="ref" reference="eq:vehcons"}
+  Vehicle-capacity flow                             353,600 Eq. [\[eq:vehcap\]](#eq:vehcap){reference-type="ref" reference="eq:vehcap"}
+  Turnaround exemption (McCormick, 3 types)          10,200 linearization of Eq. [\[eq:distbudget\]](#eq:distbudget){reference-type="ref" reference="eq:distbudget"}
+  Distance budget                                       400 Eq. [\[eq:distbudget\]](#eq:distbudget){reference-type="ref" reference="eq:distbudget"}
+  Loss definition, CVaR excess                          200 Eq. [\[eq:loss\]](#eq:loss){reference-type="ref" reference="eq:loss"}, [\[eq:cvar1\]](#eq:cvar1){reference-type="ref" reference="eq:cvar1"}
+  **Total**                                     **813,202** matches `model.NumConstrs`
+
+  : Constraint counts.
+:::
+
+Arc capacity and vehicle-capacity flow are individually the two largest
+constraint types, together 87 percent of all constraints, each matching
+the shape of the $x$ variable type exactly, since each constrains a
+single flow variable. The three-constraint McCormick linearization of
+the turnaround exemption (10,200 constraints total) is the explicit,
+countable cost of keeping
+Equation [\[eq:distbudget\]](#eq:distbudget){reference-type="ref"
+reference="eq:distbudget"} linear despite the exemption's dependence on
+the product of a first-stage binary $p_j$ and second-stage flow.
+
+## Individual Vehicle Indexing for Air Assets (Experimental) {#sec:individualvehicles}
+
+Section [3.3](#sec:vehicles){reference-type="ref"
+reference="sec:vehicles"} introduced vehicle-type tracking via the
+aggregate count $n^\omega_{k,m,ij}$: the number of type-$k$ vehicles of
+mode $m$ traversing arc $(i,j)$ in scenario $\omega$, with vehicle
+identity left unindexed. As noted in
+Sections [3.3.2](#sec:timeproxy){reference-type="ref"
+reference="sec:timeproxy"} and
+[3.8](#sec:formulation){reference-type="ref"
+reference="sec:formulation"}, this aggregate formulation cannot
+distinguish a fleet of several vehicles each flying one leg from a
+single vehicle flying several legs in sequence, since both consume
+identical total fleet-wide distance and are treated as equivalent by
+Equation [\[eq:distbudget\]](#eq:distbudget){reference-type="ref"
+reference="eq:distbudget"}. This section documents an experimental
+extension that resolves this limitation for air-mode vehicle types by
+introducing per-vehicle-instance identity, scoped to $K_{\text{air}} =
+\{\text{C-17}, \text{C-130J}\}$ only; sea and land continue to use the
+aggregate formulation of
+Section [3.3](#sec:vehicles){reference-type="ref"
+reference="sec:vehicles"} unconditionally.
+
+Vehicle identity is defined *scenario-locally*: instance
+$\ell \in \{1,\ldots,F_k\}$ denotes a vehicle slot within a given
+scenario's realization, with no identity or state carried across
+scenarios. This is consistent with the existing treatment of $\Omega$ as
+a set of independent draws with the fleet returning to its base
+distribution $b_{k,j}$ at the start of every scenario
+(Section [3.3.1](#sec:vehiclebasing){reference-type="ref"
+reference="sec:vehiclebasing"}); no physical basis exists for linking a
+specific vehicle's behavior across independent disaster realizations, so
+no such linkage is introduced.
+
+### Modified and New Decision Variables
+
+The air-mode aggregate variable is replaced by a per-instance binary:
+$$\begin{equation}
+n^\omega_{k,\ell,m,ij} \in \{0,1\}, \quad
+\ell \in \{1,\ldots,F_k\},\ k \in K_{\text{air}},\ m=\text{air},\
+(i,j)\in A_{\text{air}},\ \omega \in \Omega.
+\label{eq:individualvehiclevar}
+\end{equation}$$ For $k \in K_{\text{sea}} \cup K_{\text{land}}$, the
+original aggregate $n^\omega_{k,m,ij} \in \mathbb{Z}_{\geq 0}$ is
+retained unchanged.
+
+### Modified Constraints
+
+*Aggregation link.* The air-mode aggregate count is recovered as a sum
+over vehicle instances, so that
+Equation [\[eq:vehcap\]](#eq:vehcap){reference-type="ref"
+reference="eq:vehcap"} (vehicle-capacity-constrained flow) requires no
+modification and continues to reference $n^\omega_{k,m,ij}$ exactly as
+specified in Section [3.8](#sec:formulation){reference-type="ref"
+reference="sec:formulation"}: $$\begin{equation}
+n^\omega_{k,m,ij} = \sum_{\ell=1}^{F_k} n^\omega_{k,\ell,m,ij}
+\quad \forall k \in K_{\text{air}},\ (i,j)\in A_{\text{air}},\ \omega.
+\label{eq:vehicleagglink}
+\end{equation}$$
+
+*Per-vehicle conservation.*
+Equation [\[eq:vehcons\]](#eq:vehcons){reference-type="ref"
+reference="eq:vehcons"} is restated at the instance level for air-mode
+$k$: vehicle instance $\ell$ may depart node $j$ only if present there,
+either through initial basing or arrival on a prior leg within the same
+scenario: $$\begin{equation}
+\sum_{i:(i,j)\in A_{\text{air}}} n^\omega_{k,\ell,\text{air},ij}
++ \mathbb{1}[\ell \text{ based at } j]\, p_j
+\;\geq\;
+\sum_{j':(j,j')\in A_{\text{air}}} n^\omega_{k,\ell,\text{air},jj'}
+\quad \forall k \in K_{\text{air}},\ \ell,\ j \in N,\ \omega.
+\label{eq:indvehcons}
+\end{equation}$$
+
+*Per-vehicle distance budget.*
+Equation [\[eq:distbudget\]](#eq:distbudget){reference-type="ref"
+reference="eq:distbudget"} is restated at the instance level, replacing
+the fleet-aggregate right-hand side $F_k D_k$ with the single-vehicle
+budget $D_k$: $$\begin{equation}
+\sum_{(i,j)\in A_{\text{air}}} \text{dist}_{ij}\, n^\omega_{k,\ell,\text{air},ij}
++ \psi_k \sum_{j \in N} h^\omega_{k,\ell,j}
+\;\leq\; D_k
+\quad \forall k \in K_{\text{air}},\ \ell,\ \omega.
+\label{eq:indvehdistbudget}
+\end{equation}$$ This directly closes the limitation noted in
+Section [3.3.2](#sec:timeproxy){reference-type="ref"
+reference="sec:timeproxy"}: distance consumption is now bounded per
+vehicle instance rather than pooled across the fleet, so the model can
+no longer represent an operationally implausible single vehicle
+performing the combined work of its entire fleet.
+
+### New Constraint: Single Departure Per Instance
+
+The aggregate formulation required no constraint preventing simultaneous
+departures under a single count, since $n^\omega_{k,m,ij}$ represented
+an undifferentiated total that could correctly reflect several distinct
+physical vehicles departing different nodes at once. At the instance
+level this is no longer automatic and must be imposed explicitly: a
+single vehicle instance cannot be asserted as departing more than one
+node's outbound arc set within a scenario. $$\begin{equation}
+\sum_{j:(i,j)\in A_{\text{air}}} n^\omega_{k,\ell,\text{air},ij} \leq 1
+\quad \forall i \in N,\ k \in K_{\text{air}},\ \ell,\ \omega.
+\label{eq:singledeparture}
+\end{equation}$$
+
+### Computational Status
+
+This formulation is experimental and under active evaluation for
+computational tractability at theater scale, given the substantial
+increase in binary variable count implied by the $\ell$ index
+(Equation [\[eq:individualvehiclevar\]](#eq:individualvehiclevar){reference-type="ref"
+reference="eq:individualvehiclevar"} scales the air-mode vehicle
+variable family by a factor of $F_k$ per type). A staged benchmark on a
+reduced toy network --- scaling fleet size $F_k$ and scenario count
+$|\Omega|$ independently --- is used to characterize solve-time growth
+before any attempt at full-network application. Results, including a
+determination of computational feasibility at theater scale, are
+reported in a subsequent section once available.
+
+### Summary
+
+The instance solved at $|\Omega|=100$ comprises 725,423 variables
+(327,000 integer) and 813,202 constraints. Every quantity in
+Tables [6](#tab:setsizes){reference-type="ref"
+reference="tab:setsizes"}--[8](#tab:constraintsizes){reference-type="ref"
+reference="tab:constraintsizes"} was verified against a live, unsolved
+instance of the extensive-form model (`build_only=True`) rather than
+estimated from the formulation, so the counts reported here are exact
+for the specific instance configuration (seed 32, $\alpha=1.0$) and vary
+only with $|\Omega|$, network topology, and vehicle fleet configuration,
+all of which are held fixed across the primary sensitivity sweep
+reported in Section [4](#sec:results){reference-type="ref"
+reference="sec:results"}.
+
 # Results {#sec:results}
 
 ## Primary Sensitivity Analysis Results {#sec:primary}
@@ -1031,7 +1289,76 @@ without code changes.
 
 ## Tradeoffs Between Cost, Shortfall, and Responsiveness
 
-## Sensitivity to Infrastructure Degradation and Fleet Availability
+## Planned Sensitivity Analysis Agenda {#sec:sensitivityagenda}
+
+1.  **Inventory tier scale.** Sweep tier capacities at 1$\times$
+    (current), 2$\times$, 4$\times$, and an explicitly labeled
+    supply-unconstrained bounding case at 10$\times$, to determine
+    whether inventory or fleet/arc throughput is the binding constraint
+    on service rate, and to identify the scale at which the constraint
+    transitions from one to the other.
+
+2.  **$P_{\max}$ (maximum PPL site count).** Sweep
+    $P_{\max} \in \{3, 5, 7\}$ to test whether additional prepositioning
+    sites materially improve service rate and whether the site-selection
+    stability observed at $P_{\max}=3$ (Tokyo, Seoul, Guam selected
+    across all tested conditions) persists as more site slots become
+    available.
+
+3.  **Selection budget and site-type mix.** With $P_{\max}$ fixed, vary
+    the total selection budget $B$ and per-tier activation cost to
+    determine at what budget level the constraint becomes binding and
+    begins to force selection toward lower-tier (PPL-2/3) sites rather
+    than PPL-1 hubs; not active at the current $B=12$.
+
+4.  **Fleet size.** Sweep fleet size at 50%, 100%, 150%, and 200% of
+    current values per vehicle type, to reconfirm under the current
+    (reconciled-capacity, $\beta=0.90$) model specification whether
+    fleet throughput remains slack, consistent with the earlier finding
+    that doubling fleet size did not improve mean service rate.
+
+5.  **Safety stock fraction $\rho$.** Sweep $\rho \in
+            \{0.10, 0.20, 0.30\}$ independently of inventory tier scale,
+    to isolate the effect of the safety-stock assumption from the effect
+    of total capacity, which have previously only been varied together.
+
+6.  **Multi-seed robustness across the full primary sweep.** Extend the
+    multi-seed convergence check beyond the single tested condition to
+    the full $\alpha$ sweep (and, as bandwidth allows, to items 1--4 and
+    6 above), to confirm site selection and objective stability are not
+    artifacts of a single random scenario draw at any tested condition.
+
+7.  **Demand rate $\phi_r$.** Test alternative values of
+    $\phi_{\text{food}}$ and $\phi_{\text{water}}$ against the current
+    literature-drawn values (0.15, 0.20), which are explicitly
+    identified elsewhere in this chapter as requiring USARPAC J4
+    validation before operational use.
+
+8.  **Degradation matrix $\Gamma_{m\tau}$.** Test alternative baseline
+    degradation sensitivity values against the current matrix
+    (Table [4](#tab:degradmatrix){reference-type="ref"
+    reference="tab:degradmatrix"}), which is likewise identified as a
+    starting calibration pending subject-matter expert input.
+
+9.  **Vehicle basing restriction.** Test relaxing the PPL-1-only basing
+    restriction for the C-17, C-130J, and LCU-1700
+    (Section [3.3.1](#sec:vehiclebasing){reference-type="ref"
+    reference="sec:vehiclebasing"}) to include PPL-2 sites, to determine
+    whether the degenerate-concentration fix itself is materially
+    influencing site selection or service-rate outcomes, independent of
+    the underlying network and demand structure.
+
+10. **Transfer cost multipliers $\theta_{m_1m_2}$.** Test alternative
+    values against the current placeholder multipliers
+    (Table [5](#tab:paramvalues){reference-type="ref"
+    reference="tab:paramvalues"}), pending subject-matter-expert
+    calibration.
+
+Item 6 (multi-seed robustness) functions as a resolution parameter on
+the preceding items rather than a standalone dimension: once a
+sensitivity result of interest is identified among items 1--4, it will
+be re-examined across multiple random seeds before being reported as a
+stable finding.
 
 ## Risk Posture Effects Under CVaR
 
