@@ -1,0 +1,394 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,mathtools}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\ind}{\mathbb{I}}
+\newcommand{\cvar}{\operatorname{CVaR}}
+
+\title{Type-Indexed Distance-State CVaR Model}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section{Purpose}
+
+This formulation jointly selects prepositioning locations and vehicle bases,
+routes integer counts of interchangeable vehicles by type, allocates relief
+resources, and minimizes the conditional value-at-risk (CVaR) of scenario
+loss.  Individual vehicle labels are omitted.  Per-vehicle distance limits are
+preserved by routing vehicle counts through a cumulative-distance-expanded
+network.
+
+The formulation below is the monolithic reference model.  A staged solution
+method may solve only a subset of its decisions at a time, but it does not
+change the definitions in this section.
+
+\section{Sets and indices}
+
+\begin{tabular}{ll}
+\toprule
+Symbol & Definition \\
+\midrule
+$N$ & Physical network nodes, indexed by $i,j,h$ \\
+$N^P\subseteq N$ & Candidate prepositioning locations \\
+$M$ & Transportation modes, indexed by $m$ \\
+$K$ & Vehicle types, indexed by $k$ \\
+$K_m$ & Vehicle types operating on mode $m$ \\
+$R$ & Relief-resource types, indexed by $r$ \\
+$\Omega$ & Disaster scenarios, indexed by $\omega$ \\
+$A_m\subseteq N\times N$ & Directed physical arcs available to mode $m$ \\
+$J_k\subseteq N^P$ & Eligible bases for vehicle type $k$ \\
+\bottomrule
+\end{tabular}
+
+Let $m(k)$ denote the mode used by vehicle type $k$, and define
+$A_k:=A_{m(k)}$.
+
+\section{Parameters}
+
+\begin{tabular}{ll}
+\toprule
+Symbol & Definition \\
+\midrule
+$F_k$ & Number of available vehicles of type $k$ \\
+$D_k$ & Distance budget for each type-$k$ vehicle \\
+$\psi_k$ & Turnaround time expressed as equivalent travel distance \\
+$\operatorname{cap}_k$ & Payload capacity of one type-$k$ vehicle \\
+$\ell_{ij}$ & Physical distance of arc $(i,j)$ \\
+$c_{kij}$ & Unit resource-transport cost on arc $(i,j)$ \\
+$w_r$ & Weight of one unit of resource $r$ \\
+$d^\omega_{ir}$ & Demand for resource $r$ at node $i$ in scenario $\omega$ \\
+$I_{ir}$ & Inventory available if candidate location $i$ is activated \\
+$\rho$ & Releasable fraction of inventory \\
+$\delta_{ir}$ & Unit unmet-demand penalty \\
+$f_i$ & Fixed activation cost of candidate location $i$ \\
+$B$ & Total activation budget \\
+$P_{\max}$ & Maximum number of activated locations \\
+$\pi^\omega$ & Probability of scenario $\omega$ \\
+$\beta$ & CVaR confidence level \\
+$\varepsilon$ & Small cost on vehicle movements \\
+$a^\omega_i$ & Availability of node $i$ in scenario $\omega$ \\
+$\sigma^\omega_i$ & Severity at node $i$ in scenario $\omega$ \\
+$\gamma^\omega_m$ & Degradation sensitivity for mode $m$ in scenario $\omega$ \\
+$T_{m,ij}$ & Nominal throughput of mode-$m$ arc $(i,j)$ \\
+$\Theta_{i,m}$ & Baseline vehicle-handling capacity at node $i$ \\
+$\Delta\Theta_{i,m}$ & Handling-capacity bonus if node $i$ is activated \\
+\bottomrule
+\end{tabular}
+
+The scenario availability and degradation factors are
+\begin{align}
+a^\omega_i
+&=
+\begin{cases}
+0, & \sigma^\omega_i\geq 1,\\
+1, & \sigma^\omega_i<1,
+\end{cases}
+\label{eq:availability}\\
+g^\omega_{m,ij}
+&=
+\max\left\{0,
+1-\gamma^\omega_m
+\frac{\max\{\sigma^\omega_i,\sigma^\omega_j\}}{5}
+\right\},
+\label{eq:arc-degradation}\\
+\widehat C^\omega_{kij}
+&=
+\min\left\{
+\operatorname{cap}_k,
+T_{m(k),ij}g^\omega_{m(k),ij}
+\right\}.
+\label{eq:usable-capacity}
+\end{align}
+
+The residual node-handling capacity is
+\begin{equation}
+\widehat\Theta^\omega_{i,m}(p)
+=
+\max\left\{0,1-\gamma^\omega_m\frac{\sigma^\omega_i}{5}\right\}
+\left(\Theta_{i,m}+\Delta\Theta_{i,m}p_i\right),
+\label{eq:handling-capacity}
+\end{equation}
+where $p_i:=0$ for $i\notin N^P$ and
+$\Delta\Theta_{i,m}:=0$ for $i\notin N^P$.
+
+\section{Distance-state network}
+
+Choose a number of distance buckets $H_k$ for each vehicle type.  In the
+implementation, a common bucket count $H$ is normally used, such as $H=16$.
+Define
+\begin{equation}
+\Delta_k=\frac{D_k}{H_k}
+\label{eq:bucket-width}
+\end{equation}
+and the conservative bucket consumption of arc $(i,j)$ as
+\begin{equation}
+q_{kij}
+=
+\max\left\{1,
+\left\lceil
+\frac{\ell_{ij}+\psi_k}{\Delta_k}
+\right\rceil
+\right\}.
+\label{eq:bucket-consumption}
+\end{equation}
+
+The admissible cumulative states are
+\begin{equation}
+\mathcal D_k=\{0,1,\ldots,H_k\}.
+\end{equation}
+The distance-expanded transition set is
+\begin{equation}
+\mathcal E_k^D
+=
+\left\{
+(i,j,d,d'):
+(i,j)\in A_k,\ d\in\mathcal D_k,\
+d'=d+q_{kij}\leq H_k
+\right\}.
+\label{eq:expanded-arcs}
+\end{equation}
+
+For compactness, define the outgoing and incoming expanded transitions
+\begin{align}
+\delta_k^+(i,d)
+&=
+\{(i,j,d,d')\in\mathcal E_k^D\},\\
+\delta_k^-(i,d)
+&=
+\{(h,i,d',d)\in\mathcal E_k^D\}.
+\end{align}
+
+For a physical arc $(i,j)$, define
+\begin{equation}
+\mathcal D_{kij}
+=
+\{d:(i,j,d,d+q_{kij})\in\mathcal E_k^D\}.
+\end{equation}
+
+\section{Decision variables}
+
+First-stage decisions are
+\begin{align}
+p_i &\in\{0,1\}
+&&\forall i\in N^P,
+\label{eq:domain-p}\\
+b_{kj} &\in\Z_+
+&&\forall k\in K,\ j\in J_k,
+\label{eq:domain-b}
+\end{align}
+where $b_{kj}$ is the number of type-$k$ vehicles based at $j$.
+
+Scenario-dependent recourse decisions are
+\begin{align}
+n^\omega_{kijd} &\in\Z_+
+&&\forall \omega,k,(i,j),d:
+(i,j,d,d+q_{kij})\in\mathcal E_k^D,
+\label{eq:domain-n}\\
+\bar n^\omega_{kid} &\geq0
+&&\forall\omega,k,i,d,
+\label{eq:domain-nbar}\\
+x^\omega_{kijr} &\geq0
+&&\forall\omega,k,(i,j)\in A_k,r,
+\label{eq:domain-x}\\
+y^\omega_{ir} &\geq0
+&&\forall\omega,i,r,
+\label{eq:domain-y}\\
+0\leq z^\omega_{ir} &\leq d^\omega_{ir}
+&&\forall\omega,i,r,
+\label{eq:domain-z}\\
+\Lambda^\omega &\geq0
+&&\forall\omega,
+\label{eq:domain-loss}\\
+\xi^\omega &\geq0
+&&\forall\omega,
+\label{eq:domain-xi}\\
+\eta &\in\R.
+\label{eq:domain-eta}
+\end{align}
+
+Here $n^\omega_{kijd}$ is the number of type-$k$ vehicles that traverse
+physical arc $(i,j)$ after consuming $d$ distance buckets, and
+$\bar n^\omega_{kid}$ is the number terminating at node $i$ in state $d$.
+
+\section{Objective}
+
+The model minimizes CVaR of scenario loss:
+\begin{equation}
+\min\quad
+\eta+
+\frac{1}{1-\beta}
+\sum_{\omega\in\Omega}\pi^\omega\xi^\omega.
+\label{eq:objective}
+\end{equation}
+
+\section{Constraints}
+
+\subsection{Site activation and aggregate basing}
+
+\begin{align}
+\sum_{i\in N^P}p_i
+&\leq P_{\max},
+\label{eq:site-limit}\\
+\sum_{i\in N^P}f_i p_i
+&\leq B,
+\label{eq:activation-budget}\\
+\sum_{j\in J_k}b_{kj}
+&=F_k
+&&\forall k\in K,
+\label{eq:fleet-assignment}\\
+b_{kj}
+&\leq F_k p_j
+&&\forall k\in K,\ j\in J_k.
+\label{eq:base-link}
+\end{align}
+
+\subsection{Distance-state vehicle conservation}
+
+At every expanded node $(i,d)$,
+\begin{align}
+&\sum_{(i,j,d,d')\in\delta_k^+(i,d)}
+n^\omega_{kijd}
++\bar n^\omega_{kid}
+-\sum_{(h,i,d',d)\in\delta_k^-(i,d)}
+n^\omega_{khid'}
+\nonumber\\
+&\hspace{35mm}=
+\begin{cases}
+a^\omega_i b_{ki},
+& d=0,\ i\in J_k,\\
+0,&\text{otherwise},
+\end{cases}
+&&\forall\omega\in\Omega,\ k\in K,\ i\in N,\ d\in\mathcal D_k.
+\label{eq:vehicle-conservation}
+\end{align}
+
+Equation~\eqref{eq:vehicle-conservation} injects vehicle supply only at an
+available selected base in distance state zero.  Every movement advances the
+state by $q_{kij}\geq1$, and transitions beyond $H_k$ do not exist.
+
+\subsection{Vehicle payload and degraded arc capacity}
+
+For every physical vehicle arc,
+\begin{equation}
+\sum_{r\in R}w_r x^\omega_{kijr}
+\leq
+\widehat C^\omega_{kij}
+\sum_{d\in\mathcal D_{kij}}n^\omega_{kijd}
+\qquad
+\forall\omega,k,(i,j)\in A_k.
+\label{eq:vehicle-capacity}
+\end{equation}
+
+\subsection{Node handling capacity}
+
+\begin{equation}
+\sum_{k\in K_m}
+\sum_{\substack{(h,i)\in A_k\\d\in\mathcal D_{khi}}}
+n^\omega_{khid}
+\leq
+\widehat\Theta^\omega_{i,m}(p)
+\qquad
+\forall\omega\in\Omega,\ m\in M,\ i\in N.
+\label{eq:node-handling}
+\end{equation}
+
+\subsection{Resource balance}
+
+For each scenario, node, and resource,
+\begin{align}
+&\sum_{k\in K}
+\sum_{(j,i)\in A_k}x^\omega_{kjir}
++\rho I_{ir}a^\omega_i p_i
++z^\omega_{ir}
+\nonumber\\
+&\hspace{25mm}=
+d^\omega_{ir}
++y^\omega_{ir}
++\sum_{k\in K}
+\sum_{(i,j)\in A_k}x^\omega_{kijr}
+&&\forall\omega\in\Omega,\ i\in N,\ r\in R,
+\label{eq:resource-balance}
+\end{align}
+where $I_{ir}p_i:=0$ for $i\notin N^P$.
+
+\subsection{Scenario loss and CVaR}
+
+Scenario loss is
+\begin{align}
+\Lambda^\omega
+=
+&\sum_{i\in N}\sum_{r\in R}
+\delta_{ir}z^\omega_{ir}
+\nonumber\\
+&+
+\sum_{k\in K}\sum_{(i,j)\in A_k}\sum_{r\in R}
+c_{kij}x^\omega_{kijr}
+\nonumber\\
+&+
+\varepsilon
+\sum_{k\in K}\sum_{(i,j)\in A_k}
+\sum_{d\in\mathcal D_{kij}}
+n^\omega_{kijd}
+&&\forall\omega\in\Omega.
+\label{eq:scenario-loss}
+\end{align}
+
+The Rockafellar--Uryasev CVaR constraints are
+\begin{equation}
+\xi^\omega
+\geq
+\Lambda^\omega-\eta
+\qquad
+\forall\omega\in\Omega.
+\label{eq:cvar-excess}
+\end{equation}
+Together with $\xi^\omega\geq0$ and objective~\eqref{eq:objective}, these
+constraints imply
+$\xi^\omega=\max\{0,\Lambda^\omega-\eta\}$ at an optimum.
+
+\section{Per-vehicle distance guarantee}
+
+For every expanded transition,
+\begin{equation}
+\ell_{ij}+\psi_k
+\leq q_{kij}\Delta_k.
+\end{equation}
+For any individual path $P$ obtained by decomposing the integer vehicle flow,
+\begin{align}
+\sum_{(i,j)\in P}(\ell_{ij}+\psi_k)
+&\leq
+\Delta_k\sum_{(i,j)\in P}q_{kij}\\
+&\leq
+\Delta_k H_k\\
+&=D_k.
+\end{align}
+Thus every decomposed vehicle path satisfies its distance budget; the limit is
+not merely enforced on the fleet average.
+
+\section{Relation to the staged algorithm}
+
+The monolithic formulation optimizes all variables jointly over
+$\Omega$.  The staged procedure uses the same detailed constraints but fixes
+decisions sequentially:
+\begin{enumerate}[label=\arabic*.]
+\item choose $p$ and $b$ with either a reduced detailed model or a strategic
+      proxy;
+\item fix $p$ and $b$ and solve the detailed integer routing problem for each
+      scenario;
+\item fix $p$, $b$, and $n$, relax those fixed variables to continuous type,
+      and solve the remaining all-scenario CVaR resource-allocation LP.
+\end{enumerate}
+The staged solution is feasible for the detailed formulation when every stage
+is feasible, but it is not generally globally optimal because earlier fixed
+decisions cannot be revised in the final CVaR solve.
+
+\end{document}

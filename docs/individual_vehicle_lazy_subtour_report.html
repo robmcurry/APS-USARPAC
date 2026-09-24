@@ -1,0 +1,746 @@
+<title>Individual Vehicle Indexing — Lazy Subtour Elimination Report</title>
+
+<style>
+:root {
+  --bg: #F6F5F1;
+  --bg-raised: #FFFFFF;
+  --ink: #1B1D21;
+  --ink-soft: #565A61;
+  --ink-faint: #8A8E95;
+  --border: #DCDAD3;
+  --border-soft: #E9E7E1;
+  --accent: #2B5F8A;
+  --accent-ink: #1D4666;
+  --accent-soft: #E4EDF3;
+  --mono-bg: #EDEBE4;
+  --mono-bg-strong: #E3E0D7;
+  --success: #2F7D4F;
+  --success-soft: #E4F1E8;
+  --warning: #A5691A;
+  --warning-soft: #F5EAD9;
+  --critical: #A6382F;
+  --critical-soft: #F5E3E1;
+  --chip-neutral: #EFEDE6;
+  --shadow: 0 1px 2px rgba(20,20,15,0.04), 0 6px 20px -8px rgba(20,20,15,0.10);
+}
+
+:root[data-theme="dark"] {
+  --bg: #15171B;
+  --bg-raised: #1C1F24;
+  --ink: #E8E8E6;
+  --ink-soft: #A5A9AF;
+  --ink-faint: #71757C;
+  --border: #2B2E34;
+  --border-soft: #23262B;
+  --accent: #79B0DC;
+  --accent-ink: #A8D0EE;
+  --accent-soft: #1D2A33;
+  --mono-bg: #1A1D22;
+  --mono-bg-strong: #20242A;
+  --success: #63C088;
+  --success-soft: #1B2A21;
+  --warning: #E0A748;
+  --warning-soft: #2E2417;
+  --critical: #E1867E;
+  --critical-soft: #2F1F1E;
+  --chip-neutral: #21242A;
+  --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -8px rgba(0,0,0,0.5);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #15171B;
+    --bg-raised: #1C1F24;
+    --ink: #E8E8E6;
+    --ink-soft: #A5A9AF;
+    --ink-faint: #71757C;
+    --border: #2B2E34;
+    --border-soft: #23262B;
+    --accent: #79B0DC;
+    --accent-ink: #A8D0EE;
+    --accent-soft: #1D2A33;
+    --mono-bg: #1A1D22;
+    --mono-bg-strong: #20242A;
+    --success: #63C088;
+    --success-soft: #1B2A21;
+    --warning: #E0A748;
+    --warning-soft: #2E2417;
+    --critical: #E1867E;
+    --critical-soft: #2F1F1E;
+    --chip-neutral: #21242A;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -8px rgba(0,0,0,0.5);
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: ui-serif, Georgia, "Iowan Old Style", "Palatino Linotype", serif;
+  font-size: 16.5px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+.sans { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+.mono, code, pre, .tabular { font-family: ui-monospace, "SF Mono", "Menlo", "Cascadia Code", monospace; font-variant-numeric: tabular-nums; }
+
+.page {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 3.5rem 1.75rem 6rem;
+}
+
+/* ---------- Header ---------- */
+.report-head {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 1.75rem;
+  margin-bottom: 2.5rem;
+}
+.eyebrow {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 0.72rem;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--accent-ink);
+  font-weight: 600;
+  margin: 0 0 0.6rem;
+}
+h1.title {
+  font-size: 2.15rem;
+  line-height: 1.18;
+  margin: 0 0 0.7rem;
+  font-weight: 600;
+  text-wrap: balance;
+  letter-spacing: -0.01em;
+}
+.deck {
+  color: var(--ink-soft);
+  font-size: 1.08rem;
+  max-width: 62ch;
+  margin: 0 0 1.1rem;
+}
+.meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.4rem;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 0.82rem;
+  color: var(--ink-faint);
+}
+.meta-row b { color: var(--ink-soft); font-weight: 600; }
+
+/* ---------- Sections ---------- */
+section { margin: 3rem 0; }
+section > h2 {
+  font-size: 1.36rem;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  margin: 0 0 0.3rem;
+  text-wrap: balance;
+}
+.section-sub {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--ink-faint);
+  font-size: 0.86rem;
+  margin: 0 0 1.3rem;
+}
+h3 {
+  font-size: 1.06rem;
+  font-weight: 600;
+  margin: 1.8rem 0 0.6rem;
+}
+p { margin: 0 0 1rem; max-width: 68ch; }
+ul, ol { max-width: 66ch; padding-left: 1.3rem; }
+li { margin-bottom: 0.45rem; }
+a { color: var(--accent-ink); }
+
+/* ---------- Callout / TLDR ---------- */
+.callout {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+  padding: 1.3rem 1.5rem;
+  box-shadow: var(--shadow);
+}
+.callout h3 { margin-top: 0; font-family: -apple-system, sans-serif; font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent-ink); }
+.callout p:last-child { margin-bottom: 0; }
+.callout ul { margin: 0.6rem 0 0; }
+
+/* ---------- Status pills ---------- */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 0.18em 0.65em;
+  border-radius: 100px;
+  white-space: nowrap;
+}
+.pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.pill-critical { background: var(--critical-soft); color: var(--critical); }
+.pill-warning { background: var(--warning-soft); color: var(--warning); }
+.pill-success { background: var(--success-soft); color: var(--success); }
+.pill-neutral { background: var(--chip-neutral); color: var(--ink-soft); }
+
+/* ---------- Tables ---------- */
+.table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow); background: var(--bg-raised); }
+table { border-collapse: collapse; width: 100%; min-width: 640px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 0.86rem; }
+th, td { text-align: left; padding: 0.62rem 0.85rem; border-bottom: 1px solid var(--border-soft); white-space: nowrap; }
+th { font-weight: 600; font-size: 0.72rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-faint); background: var(--mono-bg); position: sticky; top: 0; }
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover { background: var(--accent-soft); }
+td.num, th.num { text-align: right; font-family: ui-monospace, "SF Mono", monospace; font-variant-numeric: tabular-nums; }
+td.emph { font-weight: 600; }
+
+/* ---------- Code / log blocks ---------- */
+.codeblock {
+  background: var(--mono-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem 1.2rem;
+  overflow-x: auto;
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+.codeblock pre { margin: 0; white-space: pre; }
+.filepath { background: var(--mono-bg-strong); border-radius: 4px; padding: 0.1em 0.4em; font-size: 0.88em; }
+
+/* ---------- Diagram ---------- */
+.diagram-wrap {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.4rem;
+  box-shadow: var(--shadow);
+  overflow-x: auto;
+}
+
+/* ---------- Charts ---------- */
+.chart-card {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.3rem 1.4rem 1rem;
+  box-shadow: var(--shadow);
+}
+.chart-card h4 {
+  font-family: -apple-system, sans-serif;
+  font-size: 0.86rem;
+  font-weight: 600;
+  margin: 0 0 0.1rem;
+}
+.chart-note { font-family: -apple-system, sans-serif; font-size: 0.76rem; color: var(--ink-faint); margin: 0 0 0.8rem; }
+canvas { width: 100%; display: block; }
+.chart-grid { display: grid; grid-template-columns: 1fr; gap: 1.4rem; }
+@media (min-width: 760px) { .chart-grid.two { grid-template-columns: 1fr 1fr; } }
+
+/* ---------- Stat row ---------- */
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.9rem; }
+.stat {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.9rem 1rem;
+}
+.stat .v { font-family: ui-monospace, monospace; font-size: 1.25rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.stat .l { font-family: -apple-system, sans-serif; font-size: 0.72rem; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 0.25rem; }
+
+/* ---------- Timeline (experiment log) ---------- */
+.tl-item {
+  display: grid;
+  grid-template-columns: 84px 1fr;
+  gap: 1rem;
+  padding: 1.1rem 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+.tl-item:last-child { border-bottom: none; }
+.tl-tag { font-family: -apple-system, sans-serif; font-size: 0.72rem; color: var(--ink-faint); padding-top: 0.2rem; }
+.tl-body h4 { margin: 0 0 0.35rem; font-size: 1rem; font-family: -apple-system, sans-serif; font-weight: 600; }
+.tl-body p { margin: 0 0 0.5rem; font-size: 0.92rem; }
+.tl-metrics { display: flex; flex-wrap: wrap; gap: 0.4rem 0.9rem; font-family: ui-monospace, monospace; font-size: 0.78rem; color: var(--ink-soft); }
+.tl-metrics b { color: var(--ink); }
+
+/* ---------- Direction cards ---------- */
+.dir-card {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.2rem 1.4rem;
+  box-shadow: var(--shadow);
+  margin-bottom: 1rem;
+}
+.dir-card h4 { margin: 0 0 0.15rem; font-family: -apple-system, sans-serif; font-size: 1rem; }
+.dir-card .dir-tag { font-family: -apple-system, sans-serif; font-size: 0.7rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--accent-ink); font-weight: 600; }
+.dir-card p { margin: 0.5rem 0 0; font-size: 0.94rem; }
+
+hr.rule { border: none; border-top: 1px solid var(--border); margin: 2.6rem 0; }
+
+.footer {
+  margin-top: 4rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+  font-family: -apple-system, sans-serif;
+  font-size: 0.78rem;
+  color: var(--ink-faint);
+}
+</style>
+
+<div class="page">
+
+  <div class="report-head">
+    <p class="eyebrow">aps_usarpac &middot; individual-vehicle-indexing branch</p>
+    <h1 class="title">Individual Vehicle Indexing + Lazy Subtour Elimination: Tractability Investigation</h1>
+    <p class="deck">A working log of implementing per-vehicle-instance indexing for air-mode fleets (C-17, C-130J) with Gurobi lazy-constraint subtour elimination, and the resulting tractability wall at real fleet sizes on the full 50-node network &mdash; four mitigations attempted, all converging on the same diagnosis.</p>
+    <div class="meta-row">
+      <span><b>Repo</b> aps_usarpac/model/model.py</span>
+      <span><b>Branch</b> individual-vehicle-indexing</span>
+      <span><b>Network</b> 50 nodes, 1,502 air arcs</span>
+      <span><b>Real fleet</b> C-17&times;12, C-130J&times;16</span>
+      <span><b>Solver</b> Gurobi (academic license)</span>
+    </div>
+  </div>
+
+  <section id="tldr">
+    <div class="callout">
+      <h3>Summary for review</h3>
+      <p><b>What works:</b> the individual-vehicle formulation (per-instance binaries <code>n_ind[w,k,l,i,j]</code>) and its lazy-callback subtour elimination are implemented, correct, and validated &mdash; confirmed on a toy network with a genuine non-home cycle (3 phantom double-booked instances with no mitigation &rarr; 0 with the callback active), and confirmed cheap (callback overhead never exceeded 1% of wall-clock in any run, including the 3-hour one).</p>
+      <p><b>What doesn't work yet:</b> at real fleet sizes (C-17=12, C-130J=16 &rarr; 28 individually-indexed instances) on the real 50-node/1,502-air-arc network, the extensive-form MIP cannot find <i>any</i> feasible solution in 45 minutes, and only reaches depth 5 of the branch-and-bound tree (49 nodes, best bound essentially frozen) after a full 3 hours. A parallel run at the toy-tested fleet size (F<sub>k</sub>=1) finds 4 solutions and 12.09% gap in the same 45 minutes &mdash; so the wall is fleet-size-specific, not a general property of the network or the callback mechanism.</p>
+      <p><b>Two mitigations tried, both ineffective:</b> scalar symmetry-breaking constraints (ordering same-home-node instances by total arc count) and Gurobi's <code>MIPFocus=1</code>. Neither meaningfully moved the best bound.</p>
+    </div>
+    <div class="callout" style="border-left-color: var(--warning); margin-top: 1rem;">
+      <h3 style="color: var(--warning);">Update &middot; Run 6 &middot; &beta;=0.5 was independently compounding the difficulty</h3>
+      <p>All five runs above (and the diagnosis drawn from them) used &beta;=0.5 &mdash; a diagnostic override, not the real locked value &beta;=0.90. A sixth run repeating Run 1's exact plain-baseline configuration (no symmetry-break, no MIPFocus) with <b>only &beta; changed to 0.90</b> found <b>2,731 branch-and-bound nodes at depth 108</b>, versus Run 1's <b>1 node at depth 0</b> &mdash; in the identical 45-minute budget. See &sect;3.5. This does not overturn the size/scale findings (&sect;5), but it means the "intractable" conclusion in &sect;6 was drawn entirely under the hardest tail-weighting tested, and needs qualification.</p>
+    </div>
+  </section>
+
+  <section id="architecture">
+    <h2>1. Pipeline &amp; what changed</h2>
+    <p class="section-sub">Where this branch's work sits in the existing three-stage pipeline</p>
+    <div class="diagram-wrap">
+<pre class="mermaid">
+flowchart LR
+    A["pacific_cities.csv /\nnetwork/nodes.csv"] --> B["network_builder.py\n(50-node graph, modal arcs)"]
+    B --> C["scenario_generator.py\n(N scenarios, seed)"]
+    C --> D["input_builder.py\nbuild_stochastic_instance()\n+ build_vehicle_params()"]
+    D --> E{"model.py\nsolve_stochastic_cvar()"}
+    E -->|"vehicle_formulation=\naggregate (unchanged)"| F["n[w,k,m,i,j]\ninteger vehicle-count\n(locked baseline)"]
+    E -->|"vehicle_formulation=\nindividual (this branch)"| G["n_ind[w,k,l,air,i,j]\nper-instance binary"]
+    G --> H["_build_subtour_callback()\nGurobi LazyConstraints\ncbLazy SEC cuts"]
+    G --> I["VehicleSymmetryBreak\n(scalar ordering, new)"]
+    H --> J["model.optimize(callback)\nMIPFocus=1 (new)"]
+    I --> J
+    F --> K["model.optimize()\n(unchanged, Method=2)"]
+</pre>
+    </div>
+    <h3>Code changes this session (<span class="filepath">model/model.py</span>)</h3>
+    <ul>
+      <li><b><code>_build_subtour_callback()</code></b> &mdash; new module-level function. On every Gurobi <code>MIPSOL</code>, batches <code>cbGetSolution</code> over all <code>n_ind</code>, does forward BFS reachability from each vehicle instance's fixed home node, groups any unreached selected arcs into weakly-connected components, and adds a direct DFJ-style subtour-elimination cut per component: <code>&sum;<sub>a,b&isin;S</sub> n_ind[w,k,l,air,a,b] &le; |S|&minus;1</code>.</li>
+      <li><b>Default flip:</b> <code>_debug_skip_departure_single_node</code> default changed <code>False&rarr;True</code> &mdash; the static <code>DepartureSingleNode</code>/<code>DepartureNodeLink</code> constraints (5) are now off by default; the lazy callback is the sole subtour-elimination mechanism going forward. Passing <code>False</code> restores the static constraint for A/B comparison; the callback still attaches independently either way.</li>
+      <li><b><code>VehicleSymmetryBreak</code></b> (new constraint family) &mdash; for each (type, home node) group with &ge;2 interchangeable instances, orders them by total outbound air-arc count: <code>total_outbound[w,k,l] &le; total_outbound[w,k,l+1]</code>. Provably preserves at least one optimum (any solution can be relabeled within an interchangeable group to satisfy the order).</li>
+      <li><b><code>MIPFocus=1</code></b> &mdash; set only when <code>vehicle_formulation="individual"</code>, alongside the existing <code>LazyConstraints=1</code>. Does not touch the aggregate branch.</li>
+      <li>All four changes scoped strictly to <code>vehicle_formulation="individual"</code>; <span class="pill pill-success">aggregate regression: ALL PASS</span> re-confirmed after every change (objective, sites, gap, and all 19 variable/constraint family counts match the locked <span class="filepath">baseline_aggregate_toy.json</span> baseline exactly, every time).</li>
+    </ul>
+  </section>
+
+  <section id="validation">
+    <h2>2. Toy-scale correctness validation</h2>
+    <p class="section-sub">Before any real-network spend &mdash; all on the 4-node/5-scenario toy instance (<span class="filepath">toy_vehicle_test.py</span>)</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Test</th><th>Config</th><th>Result</th><th>Verdict</th></tr></thead>
+        <tbody>
+          <tr><td>Smoke test</td><td class="mono">F<sub>k</sub>=1, callback on</td><td class="mono">OPTIMAL, 0.43% gap, 339 vars / 672 constrs</td><td><span class="pill pill-success">clean</span></td></tr>
+          <tr><td>fk2 departure test (a)</td><td class="mono">F<sub>k</sub>=2, static constr. 5 ON + callback</td><td class="mono">obj=899,868,645 &middot; 0 phantom</td><td><span class="pill pill-success">clean</span></td></tr>
+          <tr><td>fk2 departure test (b)</td><td class="mono">F<sub>k</sub>=2, static constr. 5 OFF, DAG net.</td><td class="mono">obj=870,431,613 &middot; 0 phantom</td><td><span class="pill pill-neutral">DAG &mdash; no cycle to test</span></td></tr>
+          <tr><td>Cyclic test (no mitigation)</td><td class="mono">F<sub>k</sub>=2, added 2&harr;3 cycle, no constr., no callback</td><td class="mono"><b>3 phantom / disconnected instances</b></td><td><span class="pill pill-critical">bug confirmed</span></td></tr>
+          <tr><td>Cyclic test (callback)</td><td class="mono">F<sub>k</sub>=2, same cyclic net., callback only</td><td class="mono">obj=866,362,177 &middot; <b>0 phantom</b> (1 cut, 3 MIPSOL calls)</td><td><span class="pill pill-success">fixed</span></td></tr>
+          <tr><td>Feasibility probe</td><td class="mono">force n_ind onto phantom pair, constr. 5 off</td><td class="mono">Gurobi status: FEASIBLE</td><td><span class="pill pill-neutral">proves constr. 3 alone insufficient</span></td></tr>
+          <tr><td>Symmetry-break check</td><td class="mono">F<sub>k</sub>=2, cyclic net. + VehicleSymmetryBreak</td><td class="mono">10 new constrs, obj &Delta;&lt;0.001%, <b>0 phantom</b></td><td><span class="pill pill-success">clean</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>The cyclic test is the load-bearing proof: it added a return arc (3,2) opposite the existing (2,3), giving one non-home 2&harr;3 cycle. With no subtour-elimination mechanism, the solver freely double-booked 3 vehicle instances onto that cycle for zero home-departure cost &mdash; e.g. instance <code>w=0, k=C-130J, l=1</code> showed selected arcs <code>{(1,4), (2,3), (3,2)}</code> where only <code>(1,4)</code> was reachable from home node 1. The lazy callback eliminates this with a single cut.</p>
+  </section>
+
+  <section id="results">
+    <h2>3. Real-network experiment log</h2>
+    <p class="section-sub">50 nodes, 1,502 air arcs, N=10 scenarios, seed=32, &beta;=0.5 (diagnostic override &mdash; see note below) unless stated</p>
+
+    <div class="tl-item">
+      <div class="tl-tag mono">RUN 1</div>
+      <div class="tl-body">
+        <h4>Baseline lazy callback &middot; real fleet (F<sub>k</sub>=12/16) &middot; 45-min cap</h4>
+        <p>First real-scale test of the individual formulation. Problem size alone was the first surprise: <b>493,323 variables (420,582 binary)</b> from <code>n_ind</code> and 125,222 constraints &mdash; two to three orders of magnitude past anything toy-tested.</p>
+        <div class="tl-metrics">
+          <span><b>Status</b> TIME_LIMIT</span><span><b>SolCount</b> 0</span><span><b>Nodes</b> 1</span>
+          <span><b>Best bound</b> 1.7643e9</span><span><b>Wall-clock</b> 2703.1s</span><span><b>Peak RSS</b> 1953 MB</span>
+          <span><b>Lazy cuts</b> 1163</span><span><b>MIPSOL calls</b> 12</span><span><b>Callback time</b> 2.26s / 2700s</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="tl-item">
+      <div class="tl-tag mono">RUN 2</div>
+      <div class="tl-body">
+        <h4>Fleet-size isolation diagnostic &middot; F<sub>k</sub>=1/1 &middot; 45-min cap</h4>
+        <p>Same network, same N, same everything &mdash; only C-17/C-130J fleet size dropped to the toy-tested minimum (1 each &rarr; 2 instances instead of 28). Tests whether the wall is network density or fleet-size combinatorics.</p>
+        <div class="tl-metrics">
+          <span><b>Status</b> TIME_LIMIT</span><span><b>SolCount</b> <span style="color:var(--success)">4</span></span><span><b>Nodes</b> <span style="color:var(--success)">306,544</span></span>
+          <span><b>Gap</b> 12.09%</span><span><b>Best bound</b> 2.2638e9</span><span><b>Wall-clock</b> 3363.1s (overshot &mdash; see note)</span>
+          <span><b>Peak RSS</b> 3953 MB</span><span><b>Subtour check</b> 0 phantom / 4</span>
+        </div>
+        <p style="margin-top:0.6rem"><span class="pill pill-success">Conclusion</span> the formulation and callback scale fine &mdash; the wall is fleet-size-specific, not network density or a callback defect.</p>
+      </div>
+    </div>
+
+    <div class="tl-item">
+      <div class="tl-tag mono">RUN 3</div>
+      <div class="tl-body">
+        <h4>+ VehicleSymmetryBreak &middot; real fleet (F<sub>k</sub>=12/16) &middot; 45-min cap</h4>
+        <p>Hypothesis: permutation symmetry among 12 interchangeable C-17s / 16 interchangeable C-130Js (many sharing a home node) is blowing up the B&amp;B tree. Added scalar ordering constraints scoped per (type, home-node) group (200 new constraints, confirmed via row-count delta).</p>
+        <div class="tl-metrics">
+          <span><b>Status</b> TIME_LIMIT</span><span><b>SolCount</b> 0</span><span><b>Nodes</b> 1</span>
+          <span><b>Best bound</b> 1.7640e9</span><span><b>Wall-clock</b> 2703.2s</span><span><b>Peak RSS</b> 1737 MB</span>
+          <span><b>Lazy cuts</b> 884</span><span><b>MIPSOL calls</b> 8</span>
+        </div>
+        <p style="margin-top:0.6rem"><span class="pill pill-critical">Result</span> best bound essentially identical to Run 1 (&Delta;&lt;0.02%). Symmetry-breaking constraints correctly wired in but had no measurable effect.</p>
+      </div>
+    </div>
+
+    <div class="tl-item">
+      <div class="tl-tag mono">RUN 4</div>
+      <div class="tl-body">
+        <h4>+ MIPFocus=1 &middot; real fleet (F<sub>k</sub>=12/16) &middot; 45-min cap</h4>
+        <p>Solver-level tuning to prioritize finding <i>any</i> incumbent over proving optimality, in place of the symmetry-break constraints.</p>
+        <div class="tl-metrics">
+          <span><b>Status</b> TIME_LIMIT</span><span><b>SolCount</b> 0</span><span><b>Nodes</b> 1 (2 children created in final seconds)</span>
+          <span><b>Best bound</b> 1.7635e9</span><span><b>Wall-clock</b> 2703.2s</span><span><b>Peak RSS</b> 1618 MB</span>
+          <span><b>Lazy cuts</b> 399</span><span><b>MIPSOL calls</b> 3</span>
+        </div>
+        <p style="margin-top:0.6rem"><span class="pill pill-warning">Result</span> first sign of life &mdash; branching began, but only in the last instant of the 45-minute budget.</p>
+      </div>
+    </div>
+
+    <div class="tl-item">
+      <div class="tl-tag mono">RUN 5</div>
+      <div class="tl-body">
+        <h4>+ MIPFocus=1, extended &middot; real fleet (F<sub>k</sub>=12/16) &middot; 3-hour cap, memory-monitored</h4>
+        <p>One-off exploratory run (4&times; budget) to see whether Run 4's late branching continues given more time. First attempt self-aborted safely at 526s on system-wide memory pressure (unrelated to this job &mdash; see &sect;5); relaunched after confirming headroom. Full run completed cleanly, no aborts.</p>
+        <div class="tl-metrics">
+          <span><b>Status</b> TIME_LIMIT</span><span><b>SolCount</b> 0</span><span><b>Nodes</b> <span style="color:var(--warning)">49</span> (depth 5)</span>
+          <span><b>Best bound</b> 1.7636e9</span><span><b>Wall-clock</b> 10,803.2s (3.00 hr)</span><span><b>Peak RSS</b> 5,207 MB</span>
+          <span><b>Lazy cuts</b> 399 (unchanged from Run 4)</span><span><b>MIPSOL calls</b> 3 (unchanged)</span>
+        </div>
+        <p style="margin-top:0.6rem"><span class="pill pill-critical">Result</span> 2.7 additional hours of branching bought 5 levels of tree depth and zero incumbents; best bound moved &lt;0.01% past Run 4. Extrapolated convergence rate is impractical (see &sect;4 chart and &sect;6 diagnosis) &mdash; <b>under &beta;=0.5.</b> See Run 6 immediately below for the same test at the real &beta; value.</p>
+      </div>
+    </div>
+
+    <div class="tl-item" id="run6" style="background: var(--warning-soft); margin: 0 -1.4rem; padding: 1.1rem 1.4rem; border-radius: 8px;">
+      <div class="tl-tag mono" style="color: var(--warning);">RUN 6</div>
+      <div class="tl-body">
+        <h4>&beta;=0.90 (real value), otherwise identical to Run 1 &middot; 45-min cap</h4>
+        <p><b>This is the most consequential single result in this investigation.</b> Isolated single-variable test: exact Run 1 configuration (plain lazy-callback baseline, symmetry-break and MIPFocus both explicitly disabled via new debug toggles), F<sub>k</sub>=12/16, N=10, seed=32 &mdash; with only &beta; changed from 0.5 to 0.90.</p>
+        <div class="table-wrap" style="margin: 0.8rem 0;">
+          <table>
+            <thead><tr><th></th><th>Run 1 (&beta;=0.5)</th><th>Run 6 (&beta;=0.90)</th></tr></thead>
+            <tbody>
+              <tr><td>Status</td><td class="mono">TIME_LIMIT, SolCount=0</td><td class="mono">TIME_LIMIT, SolCount=0</td></tr>
+              <tr><td class="emph">Nodes explored</td><td class="num tabular emph">1 (root only)</td><td class="num tabular emph">2,731</td></tr>
+              <tr><td>Max depth</td><td class="num tabular">0</td><td class="num tabular"><b>108</b></td></tr>
+              <tr><td>Best bound</td><td class="num tabular">1.7643e9</td><td class="num tabular">5.0278e9</td></tr>
+              <tr><td>Wall-clock</td><td class="num tabular">2703.1s</td><td class="num tabular">2703.0s</td></tr>
+              <tr><td>Peak RSS</td><td class="num tabular">1,953 MB</td><td class="num tabular">4,751 MB</td></tr>
+              <tr><td>Lazy cuts</td><td class="num tabular">1,163</td><td class="num tabular">731</td></tr>
+              <tr><td>MIPSOL calls</td><td class="num tabular">12</td><td class="num tabular">9</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p><b>Root-relaxation phase is beta-independent.</b> Both runs spend ~700&ndash;750s grinding through root cutting planes with IntInf in the 5,000+ range &mdash; essentially identical in character. The divergence happens the instant branching starts: at &beta;=0.5 the first branch (2,690s) was the <i>last</i> thing that happened in the whole 45 minutes; at &beta;=0.90 the first branch happened at 751s and the tree kept growing for the remaining ~32.5 minutes.</p>
+        <p><b>Node-exploration rate within Run 6: accelerating, not plateauing.</b> Splitting the branching phase into two clean halves:</p>
+        <div class="table-wrap" style="margin: 0.8rem 0;">
+          <table>
+            <thead><tr><th>Window</th><th>Duration</th><th class="num">Nodes gained</th><th class="num">Rate</th></tr></thead>
+            <tbody>
+              <tr><td>751s &rarr; 1,771s (1st half)</td><td class="mono">~17.0 min</td><td class="num tabular">781</td><td class="num tabular">45.9 /min</td></tr>
+              <tr><td>1,771s &rarr; 2,700.2s (2nd half)</td><td class="mono">~15.5 min</td><td class="num tabular">1,950</td><td class="num tabular emph">125.8 /min</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>The second half ran at ~2.7&times; the first half's rate. <b>Caveat:</b> the IntInf floor (feasibility-distance signal) barely moved &mdash; mostly 5,000&ndash;5,400 throughout, only reaching 4,813 by the end (~11% reduction). The tree is being explored faster, but that hasn't yet translated into visible progress toward an integer-feasible node. <b>Still no incumbent found even at &beta;=0.90 within 45 minutes.</b></p>
+        <p style="margin-top:0.6rem"><span class="pill pill-warning">Implication</span> every finding in &sect;6 was drawn entirely under &beta;=0.5. Whether the diagnosis holds at &beta;=0.90 given more time is the open question a longer &beta;=0.90 run would answer.</p>
+      </div>
+    </div>
+
+    <div class="callout" style="margin-top:1.6rem;">
+      <h3>Note on &beta;=0.5 (Runs 1&ndash;5)</h3>
+      <p style="margin-bottom:0">Runs 1&ndash;5 use &beta;=0.5 (CVaR tail = 5 of 10 scenarios) rather than the locked production value &beta;=0.90 (tail = 1 scenario at N=10), specifically to generate genuine routing pressure across half the instance rather than concentrating all risk-aversion weight on a single scenario. <b>Those five results are not directly comparable to locked &beta;=0.90 baselines</b> and are a lower bound on what &beta;=0.90 or larger N would show, not a direct estimate &mdash; Run 6 confirms &beta; itself matters enormously. Staged runs at &beta;=0.90 with larger N (N=25, N=50 &mdash; "Step B/C") were never reached; Step A itself never cleared the review gate before this single-N, single-variable isolation test.</p>
+    </div>
+  </section>
+
+  <section id="charts">
+    <h2>4. Best bound &amp; branch-and-bound progress (Run 5, 3-hour)</h2>
+    <p class="section-sub">The clearest single picture of the stall: root relaxation converges in ~60s, then 3 hours of work moves the bound by ~0.4% total</p>
+    <div class="chart-grid two">
+      <div class="chart-card">
+        <h4>Best bound over time</h4>
+        <p class="chart-note">Root relaxation (1.7568e9) &rarr; cutting-plane plateau &rarr; branching begins at 2,690s</p>
+        <canvas id="chartBound" height="220"></canvas>
+      </div>
+      <div class="chart-card">
+        <h4>Nodes explored over time</h4>
+        <p class="chart-note">Log scale on node count; flat until 2,690s, then depth 5 by 10,800s</p>
+        <canvas id="chartNodes" height="220"></canvas>
+      </div>
+    </div>
+    <div class="chart-card" style="margin-top:1.4rem;">
+      <h4>Process RSS over the full 3-hour run</h4>
+      <p class="chart-note">External monitor, 15s sampling &middot; peak 5,207 MB &middot; safety cap 6,000 MB (never reached) &middot; system pressure stayed normal for all 720 samples</p>
+      <canvas id="chartRss" height="180"></canvas>
+    </div>
+  </section>
+
+  <section id="sizing">
+    <h2>5. Problem size &amp; resource comparison</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Config</th><th class="num">Total vars</th><th class="num">Binary vars</th><th class="num">n_ind count</th><th class="num">Constraints</th><th class="num">Peak RSS</th></tr></thead>
+        <tbody>
+          <tr><td>F<sub>k</sub>=1/1 (toy-tested minimum)</td><td class="num tabular">102,543</td><td class="num tabular">30,062</td><td class="num tabular">30,040</td><td class="num tabular">111,182</td><td class="num tabular">3,953 MB</td></tr>
+          <tr><td class="emph">F<sub>k</sub>=12/16 (real fleet)</td><td class="num tabular emph">493,323</td><td class="num tabular emph">420,582</td><td class="num tabular emph">420,560</td><td class="num tabular emph">125,222&ndash;125,422</td><td class="num tabular emph">1,618&ndash;5,207 MB</td></tr>
+          <tr><td>Ratio (real / F<sub>k</sub>=1)</td><td class="num tabular">4.8&times;</td><td class="num tabular">14.0&times;</td><td class="num tabular">14.0&times;</td><td class="num tabular">1.1&times;</td><td class="num tabular">&mdash;</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="margin-top:1rem">The binary-variable count scales linearly with total fleet size (14&times; more instances &rarr; 14&times; more <code>n_ind</code> binaries) while the constraint count barely moves (1.1&times;) &mdash; the growth is entirely in the combinatorial <i>choice</i> space, not the constraint structure. This is consistent with the F<sub>k</sub>=1 vs. F<sub>k</sub>=12/16 outcome gap being a genuine combinatorial-scale effect rather than a numerically harder LP.</p>
+    <h3>System memory context (Run 5 relaunch)</h3>
+    <div class="stat-grid">
+      <div class="stat"><div class="v tabular">18.0 GB</div><div class="l">Total system RAM</div></div>
+      <div class="stat"><div class="v tabular">2.66 GB</div><div class="l">Free before relaunch</div></div>
+      <div class="stat"><div class="v tabular">5,207 MB</div><div class="l">Peak process RSS</div></div>
+      <div class="stat"><div class="v tabular">720 / 720</div><div class="l">Samples at normal pressure</div></div>
+    </div>
+    <p>First 3-hour attempt was safely self-terminated by an external monitoring wrapper (15s sampling of <code>kern.memorystatus_vm_pressure_level</code> + process RSS, independent of the Gurobi process) after sustained system-wide pressure escalation at 526s &mdash; the solve's own RSS at that moment was a modest 369 MB, well under any threshold, confirming the trigger was other concurrently-running applications, not this job. The design choice was a graceful <code>SIGTERM</code> via an external watchdog rather than relying on macOS's own jetsam killer, which had previously caused an uncontrolled kill on this machine (see prior efficiency-fix history). After the user closed other applications, the relaunch ran the full 3 hours with zero pressure events.</p>
+  </section>
+
+  <section id="diagnosis">
+    <h2>6. Diagnosis</h2>
+    <div class="callout" style="border-left-color: var(--warning); margin-bottom: 1.3rem;">
+      <h3 style="color: var(--warning);">Scope note</h3>
+      <p style="margin-bottom:0">The four findings below are drawn from Runs 1&ndash;5, all of which used &beta;=0.5. <a href="#run6">Run 6</a> shows &beta; itself is a major independent factor &mdash; at &beta;=0.90, node exploration goes from 1 node/depth 0 to 2,731 nodes/depth 108 in the same 45 minutes, with an accelerating (not plateauing) node rate. Finding #1 (weak root relaxation) held equally at both &beta; values &mdash; that part looks structural. Findings #2&ndash;4 were only tested at &beta;=0.5 and have not yet been re-examined at &beta;=0.90.</p>
+    </div>
+    <p>Four independent lines of evidence, gathered across five real-network runs (all at &beta;=0.5 &mdash; see scope note above), all point to the same root cause:</p>
+    <ol>
+      <li><b>The root LP relaxation is weak, not the branching or the callback.</b> IntInf (integer infeasibility count) sits in the 4,000&ndash;6,500 range through nearly all of every run, including the 3-hour one, and improves only marginally with hundreds of cutting planes (Gomory, MIR, StrongCG, Flow cover, Zero half, RLT). The bound moves ~0.4% total across 45 minutes of pure cutting-plane work at the root, and a further &lt;0.01% across 2.7 more hours of actual branching.</li>
+      <li><b>The callback is not the bottleneck.</b> In every run, callback time is &le;1% of wall-clock (2.26s / 2700s in Run 1; 27.87s / 3362s even in the F<sub>k</sub>=1 run with many more MIPSOL hits; 16.10s / 10800s in Run 5). MIPSOL invocations stayed in the single-to-low-double digits even over 3 hours (3 calls in Run 5) &mdash; the solver simply isn't generating integer-feasible candidates often enough for the callback to matter.</li>
+      <li><b>Symmetry-breaking (scalar version) didn't help.</b> Run 3's 200 additional constraints, correctly derived and verified to preserve optimality, produced a best bound statistically indistinguishable from Run 1. Two plausible explanations, not mutually exclusive: Gurobi's own presolve already captures a comparable amount of this symmetry, or a single scalar inequality per adjacent pair is too weak relative to the true combinatorial structure to matter at this scale. A full lexicographic ordering on the entire arc-incidence vector was not tried &mdash; it is a strictly stronger (and strictly more expensive to formulate) cut than what was tested here.</li>
+      <li><b>MIPFocus=1 revealed the shape of the wall without breaking it.</b> It was the only variant across five runs to make the solver leave the root node at all. But the resulting branching is extraordinarily expensive &mdash; 100,000&ndash;1,400,000 simplex iterations per node (see &sect;4 chart) &mdash; and 2.7 hours only reached depth 5. At that rate, reaching a depth sufficient to discover feasible integer solutions, let alone a usable optimality gap, is many hours to days away, not a modest budget increase.</li>
+    </ol>
+    <p>Put together: the individual-vehicle formulation, the lazy-callback subtour elimination, and the overall pipeline are all functioning exactly as designed &mdash; the F<sub>k</sub>=1 result (306,544 nodes, 4 solutions, 12.09% gap, all in 45 minutes) proves that conclusively. What's missing is <i>formulation strength</i> at the real fleet scale: something about how 28 individually-indexed, largely-interchangeable vehicle instances relate to a 1,502-arc near-complete graph is producing a root relaxation that's far looser than the true integer hull, and neither of the two mitigations tried here (weak symmetry-breaking, solver-focus tuning) closes that gap.</p>
+  </section>
+
+  <section id="directions">
+    <h2>7. Open directions for discussion</h2>
+    <p class="section-sub">Framed as discussion points for review, not as a settled recommendation &mdash; ranked roughly by how directly each targets the diagnosis above</p>
+
+    <div class="dir-card" style="border-left: 3px solid var(--warning);">
+      <span class="dir-tag" style="color: var(--warning);">Targets: determining whether a reformulation is even necessary</span>
+      <h4>Extend the &beta;=0.90 test before pursuing formulation changes</h4>
+      <p>Given <a href="#run6">Run 6</a>, this is arguably the highest-priority next step, not a fallback &mdash; it's the cheapest possible experiment (zero new code, one parameter) and could substantially change how much of the rest of this list is worth pursuing. A longer &beta;=0.90 cap (e.g. matching Run 5's 3-hour extension) would show whether the accelerating node rate continues long enough to close the IntInf gap and reach a first incumbent, or whether it also plateaus like &beta;=0.5 did once MIPFocus was added &mdash; just later. If &beta;=0.90 converges to a usable gap within a practical time budget on its own, the column-generation/Benders/reformulation work below may not be necessary for the production configuration at all.</p>
+    </div>
+
+    <div class="dir-card">
+      <span class="dir-tag">Targets: root relaxation strength</span>
+      <h4>Column generation / Dantzig&ndash;Wolfe on a per-vehicle-instance pricing problem</h4>
+      <p>Each individual vehicle instance's route is a resource-constrained path (distance budget D<sub>k</sub>, home-node start) &mdash; exactly the structure column generation is built for. A master problem selecting route "columns" per instance, with a shortest-path-like pricing subproblem enforcing the distance budget, would sidestep the compact-formulation's weak LP relaxation entirely; subtour elimination becomes free (a column is a path by construction, not a set of arcs that can form a cycle). This is the standard approach for vehicle-routing-with-fleet-constraints problems of this shape in the OR literature, and is the most direct answer to finding #1 in &sect;6.</p>
+    </div>
+
+    <div class="dir-card">
+      <span class="dir-tag">Targets: whether individual indexing is even necessary</span>
+      <h4>Pattern/group formulation instead of full individual identity</h4>
+      <p>Since instances within a (type, home-node) group are fully interchangeable in the objective, the model may not need labeled identities at all &mdash; only a count of how many instances from each group follow each feasible route pattern. This is essentially a bin-packing-over-patterns reformulation: closer in size to the aggregate formulation (which already solves fast) while still correctly enforcing per-instance distance budgets and turnaround rules, because those rules only depend on which pattern a vehicle follows, not which specific instance follows it. Worth scoping whether the dissertation's requirement for "individual" indexing is really about vehicle <i>identity</i>, or about correctly capturing per-vehicle resource constraints that a pattern formulation could capture just as well at far lower cost.</p>
+    </div>
+
+    <div class="dir-card">
+      <span class="dir-tag">Targets: symmetry, more aggressively</span>
+      <h4>Full lexicographic ordering (not yet tried)</h4>
+      <p>Run 3 tested only a single scalar inequality per adjacent same-home pair. A full lexicographic ordering on each instance's entire arc-incidence vector (fixing an arc order and requiring instance <i>l</i>'s vector to be lexicographically &le; instance <i>l</i>+1's) is a materially stronger cut, standard in the orbitope/symmetry-breaking literature for exactly this "identical items assigned to identical slots" structure. More expensive to formulate (one binary comparison chain per arc position, per pair, per scenario) and was explicitly deferred pending validation of the cheaper version first &mdash; which is now known not to be enough on its own.</p>
+    </div>
+
+    <div class="dir-card">
+      <span class="dir-tag">Targets: root relaxation strength, cheaply</span>
+      <h4>Arc-set pruning before individual indexing</h4>
+      <p>1,502 air arcs is close to a complete graph over 50 nodes (max 2,450). Many of these arcs are almost certainly dominated on cost/distance grounds for any given origin &mdash; a k-nearest-neighbor or cost-percentile pre-filter (keep, say, each node's cheapest 10&ndash;15 outbound arcs) could shrink <code>n_ind</code>'s key space by an order of magnitude before any MIP-level fix is even attempted, without necessarily excluding the true optimum if genuinely long detours are already economically dominated in this cost structure. Cheapest of the ideas here to test, and orthogonal to all the others &mdash; worth trying first, or in combination.</p>
+    </div>
+
+    <div class="dir-card">
+      <span class="dir-tag">Targets: getting <i>a</i> feasible solution, even if not optimal</span>
+      <h4>Warm start derived from the aggregate formulation</h4>
+      <p>The aggregate formulation already solves fast (locked baseline: 274 vars, sub-second). Splitting its <code>n[w,k,m,i,j]</code> integer counts into a naive per-instance assignment (e.g. round-robin instances onto the aggregate's chosen arcs) would give Gurobi's MIP start mechanism a complete, feasible incumbent immediately &mdash; converting this from a "prove any solution exists" search into an "improve this solution" search, which behaves very differently under <code>MIPFocus=1</code>. Untried; flagged as the natural next experiment if the mitigations above are judged too large a scope change for now.</p>
+    </div>
+
+    <div class="dir-card">
+      <span class="dir-tag">Targets: decomposing the problem structurally</span>
+      <h4>Benders decomposition on site selection vs. routing</h4>
+      <p>The existing lazy-callback mechanism is already conceptually a Benders-style cut (infeasibility in the subproblem &rarr; cut added to the master). A fuller Benders split &mdash; first-stage <code>p[i]</code> site selection as master, all vehicle routing (including subtour elimination) as subproblem generating both feasibility and optimality cuts &mdash; is a heavier restructuring than anything tried here, but may be the most scalable long-term answer if column generation proves too large a rewrite for the current timeline.</p>
+    </div>
+  </section>
+
+  <section id="repro">
+    <h2>Appendix: reproducibility</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Artifact</th><th>Path</th></tr></thead>
+        <tbody>
+          <tr><td>Core implementation</td><td class="mono filepath">model/model.py</td></tr>
+          <tr><td>Toy instance builder (F<sub>k</sub> override)</td><td class="mono filepath">toy_vehicle_test.py</td></tr>
+          <tr><td>Smoke / departure / cyclic toy tests</td><td class="mono filepath">scripts/toy_individual_{smoke,fk2_departure,cyclic}_test.py</td></tr>
+          <tr><td>Staged real-network runner (Steps A/B/C + F<sub>k</sub>=1 diagnostic)</td><td class="mono filepath">scripts/lazy_subtour_staged_run.py</td></tr>
+          <tr><td>Aggregate regression guard</td><td class="mono filepath">scripts/check_aggregate_regression.py</td></tr>
+          <tr><td>Run 1 log</td><td class="mono filepath">output/lazy_subtour_stepA_N10_seed32.log (pre-symmetry-break copy)</td></tr>
+          <tr><td>Run 2 log (F<sub>k</sub>=1)</td><td class="mono filepath">output/lazy_subtour_stepA_fk1diag_N10_seed32.log</td></tr>
+          <tr><td>Run 5 log + memory trace (3hr)</td><td class="mono filepath">output/_probe_stepA_mipfocus_3hr.log, _probe_stepA_mipfocus_3hr_memlog.csv</td></tr>
+          <tr><td>Run 6 log (&beta;=0.90 isolation)</td><td class="mono filepath">output/lazy_subtour_stepA_beta090_N10_seed32.log</td></tr>
+          <tr><td>Locked aggregate baseline</td><td class="mono filepath">output/baseline_aggregate_toy.json</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="margin-top:1rem">All real-network runs: N=10 scenarios, seed=32, real 50-node network via <span class="filepath">network/network_builder.py</span> + <span class="filepath">scenarios/scenario_generator.py</span> + <span class="filepath">model/input_builder.py</span>, <code>mip_gap</code> from config default (1%). Vehicle fleet sizes and basing logic from <span class="filepath">config/model_parameters.yaml</span> <code>vehicles:</code> block, unchanged except where explicitly overridden (F<sub>k</sub>=1 diagnostic).</p>
+    <p><b>Debug toggles added for Run 6</b> (<span class="filepath">model/model.py</span>, both default to preserving current/post-Run-5 behavior): <code>_debug_skip_symmetry_break: bool = False</code> (pass <code>True</code> to omit the <code>VehicleSymmetryBreak</code> constraint family) and <code>_debug_mip_focus: int = 1</code> (pass <code>0</code> to restore Gurobi's default balanced focus). Together with the pre-existing <code>_debug_skip_departure_single_node</code>, these let any prior run's exact configuration be reproduced for single-variable A/B comparison.</p>
+  </section>
+
+  <div class="footer">
+    Generated from the individual-vehicle-indexing branch working session &middot; aps_usarpac &middot; all timings and metrics sourced directly from Gurobi logs and process-level monitoring, not estimated.
+  </div>
+</div>
+
+<script>
+(function(){
+  function getVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+  function drawLineChart(canvasId, xs, ys, opts){
+    opts = opts || {};
+    var canvas = document.getElementById(canvasId);
+    var dpr = window.devicePixelRatio || 1;
+    var cssW = canvas.parentElement.clientWidth;
+    var cssH = parseInt(canvas.getAttribute('height'), 10) || 200;
+    canvas.width = cssW * dpr;
+    canvas.height = cssH * dpr;
+    canvas.style.height = cssH + 'px';
+    var ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+
+    var pad = {top: 14, right: 16, bottom: 26, left: opts.leftPad || 52};
+    var w = cssW - pad.left - pad.right;
+    var h = cssH - pad.top - pad.bottom;
+
+    var ink = getVar('--ink');
+    var inkFaint = getVar('--ink-faint');
+    var border = getVar('--border-soft');
+    var accent = opts.color || getVar('--accent');
+
+    var xMin = xs[0], xMax = xs[xs.length-1];
+    var yVals = ys.slice();
+    var yMin = opts.yMin !== undefined ? opts.yMin : Math.min.apply(null, yVals);
+    var yMax = opts.yMax !== undefined ? opts.yMax : Math.max.apply(null, yVals);
+    if (opts.logY) {
+      yVals = yVals.map(function(v){ return v <= 0 ? 0 : Math.log10(v+1); });
+      yMin = 0;
+      yMax = Math.max.apply(null, yVals);
+    }
+    if (yMax === yMin) { yMax = yMin + 1; }
+
+    function xPix(x){ return pad.left + (x - xMin) / (xMax - xMin) * w; }
+    function yPix(v){
+      var vv = opts.logY ? (v <= 0 ? 0 : Math.log10(v+1)) : v;
+      return pad.top + h - (vv - yMin) / (yMax - yMin) * h;
+    }
+
+    ctx.clearRect(0,0,cssW,cssH);
+
+    // gridlines
+    ctx.strokeStyle = border;
+    ctx.lineWidth = 1;
+    var nGrid = 4;
+    ctx.font = '10px ui-monospace, monospace';
+    ctx.fillStyle = inkFaint;
+    for (var g=0; g<=nGrid; g++){
+      var gy = pad.top + h - (g/nGrid)*h;
+      ctx.beginPath();
+      ctx.moveTo(pad.left, gy);
+      ctx.lineTo(pad.left + w, gy);
+      ctx.stroke();
+      var val = opts.logY ? Math.pow(10, yMin + (g/nGrid)*(yMax-yMin)) - 1 : yMin + (g/nGrid)*(yMax-yMin);
+      var label = opts.yFormat ? opts.yFormat(val) : Math.round(val);
+      ctx.textAlign = 'right';
+      ctx.fillText(label, pad.left - 8, gy + 3);
+    }
+
+    // x axis labels (start / end)
+    ctx.textAlign = 'left';
+    ctx.fillText(opts.xFormat ? opts.xFormat(xMin) : xMin, pad.left, cssH - 6);
+    ctx.textAlign = 'right';
+    ctx.fillText(opts.xFormat ? opts.xFormat(xMax) : xMax, pad.left + w, cssH - 6);
+
+    // line
+    ctx.beginPath();
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = 2;
+    ctx.lineJoin = 'round';
+    for (var i=0;i<xs.length;i++){
+      var px = xPix(xs[i]), py = yPix(ys[i]);
+      if (i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+    }
+    ctx.stroke();
+
+    // area fill
+    ctx.lineTo(xPix(xs[xs.length-1]), pad.top+h);
+    ctx.lineTo(xPix(xs[0]), pad.top+h);
+    ctx.closePath();
+    ctx.fillStyle = accent + '1a';
+    ctx.fill();
+
+    // endpoint marker
+    var lastX = xPix(xs[xs.length-1]), lastY = yPix(ys[ys.length-1]);
+    ctx.beginPath();
+    ctx.arc(lastX, lastY, 3.5, 0, Math.PI*2);
+    ctx.fillStyle = accent;
+    ctx.fill();
+    ctx.strokeStyle = getVar('--bg-raised');
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  }
+
+  function fmtTime(s){
+    if (s < 3600) return (s/60).toFixed(0)+'m';
+    return (s/3600).toFixed(1)+'h';
+  }
+  function fmtBound(v){ return v.toFixed(4)+'e9'; }
+  function fmtMb(v){ return (v/1024).toFixed(1)+'GB'; }
+
+  var TIMES = [60.0,269.0,339.0,383.0,394.0,408.0,411.0,417.0,440.0,472.0,489.0,494.0,502.0,529.0,605.0,620.0,621.0,738.0,743.0,844.0,889.0,941.0,966.0,974.0,1120.0,1174.0,1203.0,1227.0,1242.0,1251.0,1255.0,1421.0,1428.0,1548.0,1600.0,1642.0,1664.0,1670.0,1904.0,1910.0,2690.0,3643.0,4325.0,5770.0,7052.0,10482.0,10800.0];
+  var BOUNDS = [1.75685,1.7568,1.7584,1.7587,1.7587,1.7588,1.7588,1.7588,1.7588,1.7588,1.7589,1.7589,1.7589,1.7594,1.7628,1.7628,1.7628,1.763,1.763,1.7631,1.7631,1.7631,1.7631,1.7631,1.7632,1.7632,1.7632,1.7632,1.7632,1.7632,1.7632,1.7632,1.7632,1.7634,1.7634,1.7634,1.7634,1.7634,1.7634,1.7634,1.7635,1.7635,1.7635,1.7635,1.7635,1.7635,1.7635];
+  var NODES = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,3,7,15,27,39];
+
+  var RSS_TIMES = [0.0,150.0,300.0,451.0,601.0,751.0,901.0,1052.0,1202.0,1352.0,1502.0,1652.0,1803.0,1953.0,2103.0,2253.0,2403.0,2553.0,2704.0,2854.0,3004.0,3154.0,3305.0,3455.0,3605.0,3755.0,3905.0,4056.0,4206.0,4356.0,4507.0,4657.0,4807.0,4957.0,5108.0,5258.0,5408.0,5558.0,5708.0,5859.0,6009.0,6160.0,6310.0,6460.0,6610.0,6761.0,6911.0,7061.0,7212.0,7363.0,7513.0,7664.0,7814.0,7964.0,8114.0,8265.0,8415.0,8565.0,8715.0,8866.0,9016.0,9166.0,9316.0,9467.0,9617.0,9767.0,9917.0,10067.0,10218.0,10368.0,10518.0,10668.0];
+  var RSS_VALS = [6.0,2277.0,2424.0,2588.0,2578.0,2747.0,2685.0,3159.0,2957.0,3317.0,3192.0,3199.0,3028.0,3282.0,3238.0,3089.0,3142.0,3144.0,3241.0,3245.0,3245.0,3245.0,3245.0,3245.0,3245.0,3964.0,3964.0,4032.0,4032.0,4122.0,4189.0,4128.0,4290.0,4290.0,4333.0,4038.0,4038.0,3831.0,3831.0,5183.0,5082.0,5133.0,5184.0,5165.0,5146.0,5146.0,5146.0,3045.0,4237.0,4294.0,4219.0,4392.0,4490.0,4411.0,4352.0,4219.0,4219.0,3961.0,3396.0,2729.0,2730.0,2641.0,2694.0,2734.0,2734.0,2664.0,2664.0,2664.0,2664.0,2664.0,3997.0,2970.0];
+
+  function render(){
+    drawLineChart('chartBound', TIMES, BOUNDS, {yFormat: fmtBound, xFormat: fmtTime, leftPad: 62});
+    drawLineChart('chartNodes', TIMES, NODES.map(function(n){return n;}), {logY:false, yFormat: function(v){return Math.round(v);}, xFormat: fmtTime, color: getVar('--warning')});
+    drawLineChart('chartRss', RSS_TIMES, RSS_VALS, {yFormat: fmtMb, xFormat: fmtTime, color: getVar('--success'), leftPad: 56});
+  }
+  render();
+  window.addEventListener('resize', function(){ clearTimeout(window.__rt); window.__rt = setTimeout(render, 120); });
+  var mq = window.matchMedia('(prefers-color-scheme: dark)');
+  if (mq.addEventListener) mq.addEventListener('change', render);
+  var mo = new MutationObserver(render);
+  mo.observe(document.documentElement, {attributes:true, attributeFilter:['data-theme']});
+})();
+</script>

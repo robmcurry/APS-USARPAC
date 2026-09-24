@@ -1,0 +1,454 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,mathtools}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\cvar}{\operatorname{CVaR}}
+\newcommand{\ind}{\mathbb{I}}
+
+\title{Staged Solution Method for the Type-Indexed Distance-State CVaR Model}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section{Purpose and positioning}
+
+The monolithic stochastic mixed-integer program jointly chooses facility
+activations, vehicle bases, scenario-dependent vehicle routes, resource
+allocations, and CVaR variables.  This provides the strongest optimization
+model, but it places all strategic and operational integer decisions for every
+scenario in one branch-and-bound tree.
+
+The staged method is a decomposition-based matheuristic.  It separates the
+strategic posture, detailed scenario routing, and final risk-aware allocation:
+\begin{equation*}
+\begin{gathered}
+\boxed{\text{Stage 1: choose }p,b}\\[2mm]
+\downarrow\\[2mm]
+\boxed{\text{Stage 2: choose }n^\omega\text{ separately by scenario}}\\[2mm]
+\downarrow\\[2mm]
+\boxed{\text{Stage 3: optimize full-distribution CVaR allocation}}.
+\end{gathered}
+\end{equation*}
+
+The method produces a feasible solution to the detailed model when all stages
+are feasible, but it does not generally provide a globally optimal solution
+because decisions fixed in an earlier stage cannot be revised later.
+
+\section{Compact monolithic reference model}
+
+Let
+\begin{align*}
+s&=(p,b), &&\text{first-stage strategic decisions},\\
+v^\omega&=(n^\omega,\bar n^\omega,x^\omega,y^\omega,z^\omega),
+&&\text{scenario-$\omega$ recourse decisions}.
+\end{align*}
+Here $p_i$ activates candidate site $i$, $b_{kj}$ is the number of type-$k$
+vehicles based at $j$, and $n^\omega_{kijd}$ is the integer count of type-$k$
+vehicles using arc $(i,j)$ after consuming distance state $d$.
+
+Let $\mathcal S$ denote the feasible strategic set containing site-count,
+activation-budget, fleet-assignment, and base-linking constraints.  Let
+$\mathcal F_\omega(s)$ denote the detailed distance-state recourse set for
+scenario $\omega$, including
+\begin{itemize}[nosep]
+\item distance-expanded vehicle conservation;
+\item payload and degraded arc capacity;
+\item node-handling capacity;
+\item resource balance and unmet demand; and
+\item all variable domains.
+\end{itemize}
+
+The scenario loss is
+\begin{align}
+\Lambda^\omega(s,v^\omega)
+=
+&\sum_{i\in N}\sum_{r\in R}
+\delta_{ir}z^\omega_{ir}
+\nonumber\\
+&+\sum_{k\in K}\sum_{(i,j)\in A_k}\sum_{r\in R}
+c_{kij}x^\omega_{kijr}
+\nonumber\\
+&+\varepsilon
+\sum_{k\in K}\sum_{(i,j)\in A_k}
+\sum_{d\in\mathcal D_{kij}}n^\omega_{kijd}.
+\label{eq:full-loss}
+\end{align}
+
+The monolithic reference formulation is
+\begin{align}
+\min_{s,v,\eta,\xi}\quad
+&\eta+
+\frac{1}{1-\beta}
+\sum_{\omega\in\Omega}\pi^\omega\xi^\omega
+\label{eq:monolithic-objective}\\
+\text{s.t.}\quad
+&s\in\mathcal S,
+\label{eq:monolithic-strategic}\\
+&v^\omega\in\mathcal F_\omega(s)
+&&\forall\omega\in\Omega,
+\label{eq:monolithic-recourse}\\
+&\xi^\omega\geq
+\Lambda^\omega(s,v^\omega)-\eta
+&&\forall\omega\in\Omega,
+\label{eq:monolithic-cvar}\\
+&\xi^\omega\geq0
+&&\forall\omega\in\Omega,
+\qquad \eta\in\R.
+\end{align}
+
+\section{Stage 1A: reduced-scenario detailed strategic solve}
+
+This is the Stage~1 formulation used by the standard staged solver.  Select a
+strategic scenario subset $\Omega_S\subseteq\Omega$.  The probabilities used
+within the subset are
+\begin{equation}
+\widehat\pi^\omega
+=
+\frac{\pi^\omega}
+{\sum_{\nu\in\Omega_S}\pi^\nu}
+\qquad \forall\omega\in\Omega_S.
+\label{eq:renormalized-probability}
+\end{equation}
+
+Stage~1A solves
+\begin{align}
+\min_{s,v,\eta_S,\xi}\quad
+&\eta_S+
+\frac{1}{1-\beta}
+\sum_{\omega\in\Omega_S}\widehat\pi^\omega\xi^\omega
+\label{eq:stage1-objective}\\
+\text{s.t.}\quad
+&s\in\mathcal S,
+\label{eq:stage1-strategic}\\
+&v^\omega\in\mathcal F_\omega(s)
+&&\forall\omega\in\Omega_S,
+\label{eq:stage1-recourse}\\
+&\xi^\omega\geq
+\Lambda^\omega(s,v^\omega)-\eta_S
+&&\forall\omega\in\Omega_S,
+\label{eq:stage1-cvar}\\
+&\xi^\omega\geq0
+&&\forall\omega\in\Omega_S,
+\qquad \eta_S\in\R.
+\end{align}
+
+Let the resulting incumbent strategic posture be
+\begin{equation}
+s^H=(p^H,b^H).
+\label{eq:strategic-incumbent}
+\end{equation}
+The Stage~1 routes and allocations are used to value $p$ and $b$, but they are
+discarded after the solve.  Only $p^H$ and $b^H$ are passed to Stage~2.
+
+If $\Omega_S=\Omega$, Stage~1A contains the complete monolithic formulation.
+The subsequent staged procedure nevertheless discards and reconstructs its
+operational decisions.
+
+\section{Optional Stage 1B: all-scenario strategic proxy}
+
+The proxy variant removes detailed vehicle-flow variables from Stage~1 and
+uses every scenario in $\Omega$.  It retains integer $p$ and $b$ but uses
+continuous direct-service variables:
+\begin{align*}
+t^\omega_{kji}&\geq0,
+&&\text{equivalent type-$k$ trips from base $j$ to demand node $i$},\\
+u^\omega_{kjir}&\geq0,
+&&\text{resource $r$ delivered by those trips},\\
+u^{\omega,\mathrm{loc}}_{jr}&\geq0,
+&&\text{resource $r$ used locally at activated site $j$},\\
+z^\omega_{ir}&\geq0,
+&&\text{proxy unmet demand}.
+\end{align*}
+
+For each feasible service option $(\omega,k,j,i)$, precompute
+\begin{align*}
+L^\omega_{kji}&=\text{shortest-path mission distance},\\
+C^\omega_{kji}&=\text{minimum of vehicle payload and path bottleneck},\\
+\widetilde c^\omega_{kji}&=\text{outbound unit transport cost}.
+\end{align*}
+An option is omitted if its path is unavailable or
+$L^\omega_{kji}>D_k$.
+
+The proxy payload constraints are
+\begin{equation}
+\sum_{r\in R}w_r u^\omega_{kjir}
+\leq
+C^\omega_{kji}t^\omega_{kji}
+\qquad\forall(\omega,k,j,i)\text{ retained}.
+\label{eq:proxy-payload}
+\end{equation}
+
+Aggregate fleet-distance capacity is
+\begin{equation}
+\sum_{i:(\omega,k,j,i)\text{ retained}}
+L^\omega_{kji}t^\omega_{kji}
+\leq
+D_k a^\omega_j b_{kj}
+\qquad\forall\omega,k,j.
+\label{eq:proxy-distance}
+\end{equation}
+
+For one-way proxy missions, each vehicle is used at most once:
+\begin{equation}
+\sum_{i:(\omega,k,j,i)\text{ retained}}
+t^\omega_{kji}
+\leq
+a^\omega_j b_{kj}
+\qquad\forall\omega,k,j.
+\label{eq:proxy-one-way-count}
+\end{equation}
+If return-to-base service is assumed, the return distance is included in
+$L^\omega_{kji}$ and constraint~\eqref{eq:proxy-one-way-count} is omitted,
+allowing repeated missions within the fleet-distance budget.
+
+Inventory availability is
+\begin{align}
+u^{\omega,\mathrm{loc}}_{jr}
++\sum_{k\in K}\sum_i u^\omega_{kjir}
+&\leq
+\rho I_{jr}a^\omega_jp_j
+&&\forall\omega,j\in N^P,r.
+\label{eq:proxy-inventory}
+\end{align}
+
+Demand coverage is
+\begin{equation}
+\ind_{\{i\in N^P\}}u^{\omega,\mathrm{loc}}_{ir}
++\sum_{k\in K}\sum_{j\in J_k}u^\omega_{kjir}
++z^\omega_{ir}
+=d^\omega_{ir}
+\qquad\forall\omega,i,r.
+\label{eq:proxy-demand}
+\end{equation}
+
+The proxy also retains the scenario-degraded node-handling restriction
+\begin{equation}
+\sum_{k\in K_m}\sum_{j\in J_k}t^\omega_{kji}
+\leq
+\widehat\Theta^\omega_{i,m}(p)
+\qquad\forall\omega,m,i.
+\label{eq:proxy-handling}
+\end{equation}
+
+Proxy scenario loss is
+\begin{align}
+\widetilde\Lambda^\omega
+=
+&\sum_{i\in N}\sum_{r\in R}\delta_{ir}z^\omega_{ir}
+\nonumber\\
+&+\sum_{k\in K}\sum_{j\in J_k}\sum_{i\in N}\sum_{r\in R}
+\widetilde c^\omega_{kji}u^\omega_{kjir}
+\nonumber\\
+&+\varepsilon\sum_{k\in K}\sum_{j\in J_k}\sum_{i\in N}
+t^\omega_{kji}.
+\label{eq:proxy-loss}
+\end{align}
+
+Stage~1B solves
+\begin{align}
+\min\quad
+&\widetilde\eta+
+\frac{1}{1-\beta}
+\sum_{\omega\in\Omega}\pi^\omega\widetilde\xi^\omega
+\label{eq:proxy-cvar-objective}\\
+\text{s.t.}\quad
+&s\in\mathcal S,
+\quad
+\text{constraints~\eqref{eq:proxy-payload}--\eqref{eq:proxy-handling}},
+\nonumber\\
+&\widetilde\xi^\omega
+\geq
+\widetilde\Lambda^\omega-\widetilde\eta
+&&\forall\omega\in\Omega,
+\label{eq:proxy-cvar-excess}\\
+&\widetilde\xi^\omega\geq0
+&&\forall\omega\in\Omega,
+\qquad\widetilde\eta\geq0.
+\end{align}
+
+Stage~1B minimizes CVaR of proxy losses, not detailed routed losses.  Its output
+is again the strategic incumbent $s^H=(p^H,b^H)$.
+
+\section{Stage 2: independent detailed scenario routing}
+
+Fix the strategic posture obtained from Stage~1:
+\begin{equation}
+p=p^H,
+\qquad
+b=b^H.
+\label{eq:stage2-fixing}
+\end{equation}
+
+For every $\omega\in\Omega$, solve an independent detailed distance-state
+routing problem
+\begin{align}
+Q_\omega(p^H,b^H)
+=
+\min_{v^\omega}\quad
+&\Lambda^\omega(p^H,b^H,v^\omega)
+\label{eq:stage2-objective}\\
+\text{s.t.}\quad
+&v^\omega\in\mathcal F_\omega(p^H,b^H).
+\label{eq:stage2-feasibility}
+\end{align}
+
+With one scenario, the CVaR expression reduces to that scenario's loss, so
+solving the one-scenario CVaR model is equivalent to
+equations~\eqref{eq:stage2-objective}--\eqref{eq:stage2-feasibility}.
+
+Let the selected integer route be
+\begin{equation}
+n^{H,\omega}
+\qquad\forall\omega\in\Omega.
+\label{eq:stage2-routes}
+\end{equation}
+The resource-allocation variables used to discover this route are discarded;
+they are reoptimized jointly in Stage~3.  The scenario problems are mutually
+independent once $p^H$ and $b^H$ are fixed and may therefore be solved in
+parallel.
+
+\section{Stage 3: full-distribution CVaR allocation LP}
+
+Fix all strategic and route decisions:
+\begin{equation}
+p=p^H,
+\qquad
+b=b^H,
+\qquad
+n^\omega=n^{H,\omega}
+\quad\forall\omega\in\Omega.
+\label{eq:stage3-fixing}
+\end{equation}
+
+The remaining decision variables are continuous resource allocations,
+terminations, unmet demand, retained resources, and CVaR variables.  Define
+$\mathcal X_\omega(p^H,b^H,n^{H,\omega})$ as the continuous portion of the
+detailed recourse set.  Stage~3 solves
+\begin{align}
+z^H=\min_{x,y,z,\bar n,\eta,\xi}\quad
+&\eta+
+\frac{1}{1-\beta}
+\sum_{\omega\in\Omega}\pi^\omega\xi^\omega
+\label{eq:stage3-objective}\\
+\text{s.t.}\quad
+&(x^\omega,y^\omega,z^\omega,\bar n^\omega)
+\in
+\mathcal X_\omega(p^H,b^H,n^{H,\omega})
+&&\forall\omega\in\Omega,
+\label{eq:stage3-allocation}\\
+&\xi^\omega\geq
+\Lambda^\omega(p^H,b^H,n^{H,\omega},x^\omega,y^\omega,z^\omega)-\eta
+&&\forall\omega\in\Omega,
+\label{eq:stage3-cvar}\\
+&\xi^\omega\geq0
+&&\forall\omega\in\Omega,
+\qquad\eta\in\R.
+\end{align}
+
+Because $p$, $b$, and $n$ are fixed, Stage~3 is a linear program.  Its value
+$z^H$ is the best full-distribution CVaR attainable with the staged posture and
+routes.
+
+\section{Complete staged algorithm}
+
+\begin{enumerate}[label=\textbf{Step \arabic*:},leftmargin=18mm]
+\item Generate the common scenario set $\Omega$, probabilities $\pi^\omega$,
+      demands, severities, and degraded capacities.
+\item Solve either Stage~1A or Stage~1B and retain $p^H,b^H$.
+\item For each $\omega\in\Omega$, fix $p^H,b^H$, solve the detailed routing
+      problem, and retain $n^{H,\omega}$.
+\item Build the all-scenario model, fix $p^H,b^H,n^{H,\omega}$, and solve the
+      continuous CVaR allocation problem.
+\item Report $z^H$, $\eta^H$, scenario losses, tail scenarios, selected sites,
+      vehicle base counts, routing gaps, and total runtime.
+\end{enumerate}
+
+\section{Feasibility, bounds, and interpretation}
+
+If every Stage~2 route is feasible and Stage~3 is feasible, the assembled
+solution is feasible for the detailed monolithic formulation.  Since the
+problem is a minimization problem,
+\begin{equation}
+z^*\leq z^H,
+\label{eq:upper-bound}
+\end{equation}
+where $z^*$ is the unknown monolithic optimum.  Thus $z^H$ is a valid upper
+bound for the same detailed formulation and scenario distribution.
+
+The staged method does not generate a global lower bound by itself.  If $LB$
+is obtained from a valid LP relaxation or a monolithic branch-and-bound run,
+the staged solution may be assessed using
+\begin{equation}
+\operatorname{Gap}_H
+=
+\frac{z^H-LB}{\lvert z^H\rvert}\times100\%.
+\label{eq:heuristic-gap}
+\end{equation}
+
+Stage~3 is conditionally optimal:
+\begin{equation}
+z^H
+=
+\min\left\{
+\cvar_\beta(\Lambda^\omega):
+p=p^H,\ b=b^H,\ n^\omega=n^{H,\omega}
+\right\}.
+\end{equation}
+It is not generally globally optimal over all possible $p$, $b$, and $n$.
+
+\section{Comparison with the monolithic method}
+
+\begin{center}
+\begin{tabular}{p{0.28\textwidth}p{0.31\textwidth}p{0.31\textwidth}}
+\toprule
+Feature & Monolithic method & Staged method \\
+\midrule
+Strategic and operational decisions
+& Optimized jointly
+& Fixed sequentially \\
+Scenario routing
+& One extensive-form MIP
+& One independent MIP per scenario \\
+Final CVaR
+& Jointly determines all decisions
+& Reoptimizes allocation conditional on fixed decisions \\
+Global lower bound
+& Produced by branch-and-bound
+& Requires a separate relaxation or monolithic run \\
+Global optimality
+& Possible if solved to proof
+& Not guaranteed \\
+Parallel opportunity
+& Primarily solver-internal
+& Stage~2 scenarios are independent \\
+Operational output
+& Feasible incumbent if found
+& Feasible assembled solution if all stages succeed \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Recommended reporting language}
+
+The method should be described as a \emph{staged decomposition-based
+matheuristic} or \emph{sequential fix-and-optimize method}.  It should not be
+described as Benders decomposition because no feasibility or optimality cuts
+are returned to a strategic master problem.  It should also not be described
+as exact unless the full monolithic formulation is solved to a valid global
+optimality certificate.
+
+For a fair comparison between staged variants, compare the final Stage~3
+objective values under the same scenarios, probabilities, $\beta$, distance
+buckets, and detailed routing formulation.  Stage~1A and Stage~1B objective
+values are not directly comparable because they use different recourse models
+and may use different scenario sets.
+
+\end{document}
