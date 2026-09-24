@@ -1,0 +1,262 @@
+{
+  "distance_buckets": 16,
+  "elapsed_seconds": 54.83405900001526,
+  "final_eta": 3118118743.5435557,
+  "final_gap": 0.0,
+  "final_objective": 5712424758.807871,
+  "final_runtime": 0.37544703483581543,
+  "final_scenario_losses": {
+    "0": 99290495.83099575,
+    "1": 3118118743.5435557,
+    "10": 1660515257.0427864,
+    "11": 207136524.20167437,
+    "12": 512027003.89864004,
+    "13": 1372040353.9826047,
+    "14": 6306289289.0485735,
+    "15": 0.0,
+    "16": 1889195980.9768112,
+    "17": 0.0,
+    "18": 1919315016.7378561,
+    "19": 86077605.71855895,
+    "2": 5118560228.567166,
+    "3": 207631317.1475622,
+    "4": 18352054.092373405,
+    "5": 1475731753.7633517,
+    "6": 2833967306.4488263,
+    "7": 24962876.663071726,
+    "8": 366313401.1699476,
+    "9": 734311116.8646394
+  },
+  "final_selected_sites": [
+    1,
+    46,
+    47
+  ],
+  "final_status": "OPTIMAL",
+  "fixed_route_state_arcs": 818,
+  "method": "all_scenario_strategic_proxy_then_detailed_routing",
+  "proxy_return_to_base": false,
+  "scenario_count": 20,
+  "scenario_routing": [
+    {
+      "gap": 2.7405552576232836e-06,
+      "objective": 26979.67811699078,
+      "runtime": 1.0735220909118652,
+      "scenario": 0,
+      "selected_distance_state_arcs": 10,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.0009817799673723746,
+      "objective": 1988027622.1956284,
+      "runtime": 2.7904980182647705,
+      "scenario": 1,
+      "selected_distance_state_arcs": 38,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.00862062817286058,
+      "objective": 5151279908.2560215,
+      "runtime": 1.667198896408081,
+      "scenario": 2,
+      "selected_distance_state_arcs": 51,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.0022568745522331063,
+      "objective": 97105.8532885972,
+      "runtime": 4.577311992645264,
+      "scenario": 3,
+      "selected_distance_state_arcs": 49,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 1.0488860098450056e-06,
+      "objective": 46845.35429641947,
+      "runtime": 1.1534779071807861,
+      "scenario": 4,
+      "selected_distance_state_arcs": 8,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.00819797292511156,
+      "objective": 146556349.92931807,
+      "runtime": 1.4219088554382324,
+      "scenario": 5,
+      "selected_distance_state_arcs": 75,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.0035859355983960456,
+      "objective": 1814471509.3373494,
+      "runtime": 2.9750399589538574,
+      "scenario": 6,
+      "selected_distance_state_arcs": 41,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 7.05881473773596e-06,
+      "objective": 27006.975604374147,
+      "runtime": 1.0996291637420654,
+      "scenario": 7,
+      "selected_distance_state_arcs": 6,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.0034763272272685473,
+      "objective": 64986840.99612486,
+      "runtime": 3.401339054107666,
+      "scenario": 8,
+      "selected_distance_state_arcs": 61,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.00968897844170356,
+      "objective": 54214007.52068013,
+      "runtime": 1.298487901687622,
+      "scenario": 9,
+      "selected_distance_state_arcs": 77,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.0025483342930097954,
+      "objective": 826455717.4503378,
+      "runtime": 2.698312997817993,
+      "scenario": 10,
+      "selected_distance_state_arcs": 68,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 2.071259564783343e-06,
+      "objective": 114577.031936437,
+      "runtime": 1.4440767765045166,
+      "scenario": 11,
+      "selected_distance_state_arcs": 39,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.00018523175899208555,
+      "objective": 232628324.0392689,
+      "runtime": 2.477854013442993,
+      "scenario": 12,
+      "selected_distance_state_arcs": 34,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.0029133465451983433,
+      "objective": 668865325.5493258,
+      "runtime": 2.8861398696899414,
+      "scenario": 13,
+      "selected_distance_state_arcs": 35,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.004439417213504778,
+      "objective": 6311424878.12176,
+      "runtime": 2.732016086578369,
+      "scenario": 14,
+      "selected_distance_state_arcs": 44,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.0,
+      "objective": 0.0,
+      "runtime": 0.07799410820007324,
+      "scenario": 15,
+      "selected_distance_state_arcs": 0,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.008955521109712969,
+      "objective": 690088324.4784274,
+      "runtime": 2.7250490188598633,
+      "scenario": 16,
+      "selected_distance_state_arcs": 81,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.0,
+      "objective": 0.0,
+      "runtime": 0.07661700248718262,
+      "scenario": 17,
+      "selected_distance_state_arcs": 0,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.0028531830049391437,
+      "objective": 667283471.6540573,
+      "runtime": 2.320836067199707,
+      "scenario": 18,
+      "selected_distance_state_arcs": 89,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.0017815411050532855,
+      "objective": 23232.11822683654,
+      "runtime": 1.2502899169921875,
+      "scenario": 19,
+      "selected_distance_state_arcs": 12,
+      "status": "OPTIMAL"
+    }
+  ],
+  "strategic_proxy": {
+    "basing": [
+      [
+        "C-130J",
+        47,
+        16
+      ],
+      [
+        "C-17",
+        1,
+        2
+      ],
+      [
+        "C-17",
+        46,
+        7
+      ],
+      [
+        "C-17",
+        47,
+        3
+      ],
+      [
+        "LCU-1700",
+        1,
+        3
+      ],
+      [
+        "LCU-1700",
+        46,
+        5
+      ],
+      [
+        "M1083",
+        1,
+        26
+      ],
+      [
+        "M1083",
+        46,
+        34
+      ]
+    ],
+    "eta": 5621360581.551798,
+    "gap": 5.67507609645982e-07,
+    "metadata": {
+      "delivery_variables": 16440,
+      "return_to_base": false,
+      "service_options": 8220,
+      "trip_variables": 8220
+    },
+    "objective": 6209647175.139492,
+    "runtime": 0.16952800750732422,
+    "selected_sites": [
+      1,
+      46,
+      47
+    ],
+    "status": "OPTIMAL"
+  }
+}

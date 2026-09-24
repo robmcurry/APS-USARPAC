@@ -1,0 +1,172 @@
+{
+  "distance_buckets": 16,
+  "elapsed_seconds": 33.381434202194214,
+  "final_eta": 5152289426.887202,
+  "final_gap": 0.0,
+  "final_objective": 5152289426.887202,
+  "final_runtime": 0.1684858798980713,
+  "final_scenario_losses": {
+    "0": 99420515.50563203,
+    "1": 3549813288.037252,
+    "2": 5152289426.887202,
+    "3": 207154995.6580579,
+    "4": 46431563.86737196,
+    "5": 1491280034.1450381,
+    "6": 3315403310.2201724,
+    "7": 24872379.299771722,
+    "8": 309796714.70491683,
+    "9": 697159571.0012722
+  },
+  "final_selected_sites": [
+    1,
+    46,
+    47
+  ],
+  "final_status": "OPTIMAL",
+  "fixed_route_state_arcs": 446,
+  "method": "all_scenario_strategic_proxy_then_detailed_routing",
+  "proxy_return_to_base": false,
+  "scenario_count": 10,
+  "scenario_routing": [
+    {
+      "gap": 1.2944225976273594e-06,
+      "objective": 26979.678116986135,
+      "runtime": 1.7773139476776123,
+      "scenario": 0,
+      "selected_distance_state_arcs": 17,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.007318617912674596,
+      "objective": 2000127064.898997,
+      "runtime": 5.342863082885742,
+      "scenario": 1,
+      "selected_distance_state_arcs": 30,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.00959202604301508,
+      "objective": 5157941219.331082,
+      "runtime": 3.9799790382385254,
+      "scenario": 2,
+      "selected_distance_state_arcs": 56,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.00461343784498903,
+      "objective": 97439.57406235681,
+      "runtime": 2.0419468879699707,
+      "scenario": 3,
+      "selected_distance_state_arcs": 49,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 1.0488820452310575e-06,
+      "objective": 46845.31429619179,
+      "runtime": 1.0823290348052979,
+      "scenario": 4,
+      "selected_distance_state_arcs": 6,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.009245507281399577,
+      "objective": 159996148.02625453,
+      "runtime": 1.8107988834381104,
+      "scenario": 5,
+      "selected_distance_state_arcs": 74,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.004153794181207245,
+      "objective": 1815506222.9112427,
+      "runtime": 3.0686750411987305,
+      "scenario": 6,
+      "selected_distance_state_arcs": 71,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 1.5945335631113333e-05,
+      "objective": 27007.17560561621,
+      "runtime": 1.230008840560913,
+      "scenario": 7,
+      "selected_distance_state_arcs": 15,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.003729164017941134,
+      "objective": 65003602.90050544,
+      "runtime": 3.155395984649658,
+      "scenario": 8,
+      "selected_distance_state_arcs": 50,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.0026606954140519557,
+      "objective": 65533212.29057592,
+      "runtime": 2.2791221141815186,
+      "scenario": 9,
+      "selected_distance_state_arcs": 78,
+      "status": "OPTIMAL"
+    }
+  ],
+  "strategic_proxy": {
+    "basing": [
+      [
+        "C-130J",
+        1,
+        1
+      ],
+      [
+        "C-130J",
+        46,
+        4
+      ],
+      [
+        "C-130J",
+        47,
+        11
+      ],
+      [
+        "C-17",
+        1,
+        3
+      ],
+      [
+        "C-17",
+        46,
+        5
+      ],
+      [
+        "C-17",
+        47,
+        4
+      ],
+      [
+        "LCU-1700",
+        1,
+        8
+      ],
+      [
+        "M1083",
+        47,
+        60
+      ]
+    ],
+    "eta": 5621372629.697978,
+    "gap": 2.9607109749065888e-06,
+    "metadata": {
+      "delivery_variables": 8220,
+      "return_to_base": false,
+      "service_options": 4110,
+      "trip_variables": 4110
+    },
+    "objective": 5621372629.697978,
+    "runtime": 0.020685911178588867,
+    "selected_sites": [
+      1,
+      46,
+      47
+    ],
+    "status": "OPTIMAL"
+  }
+}

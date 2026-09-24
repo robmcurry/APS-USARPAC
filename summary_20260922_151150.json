@@ -1,0 +1,977 @@
+{
+  "distance_buckets": 16,
+  "elapsed_seconds": 1976.9627900123596,
+  "final_eta": 8165983178.501718,
+  "final_gap": 0.0,
+  "final_objective": 18307404180.213802,
+  "final_runtime": 2.1891701221466064,
+  "final_scenario_losses": {
+    "0": 99714796.98670165,
+    "1": 3544247994.206218,
+    "10": 1681031248.4761698,
+    "11": 206419285.27216122,
+    "12": 531678315.89255893,
+    "13": 1417550062.4271824,
+    "14": 7940768990.97873,
+    "15": 0.0,
+    "16": 2426311960.554876,
+    "17": 0.0,
+    "18": 1954017379.312247,
+    "19": 86419256.71906486,
+    "2": 6752592495.355304,
+    "20": 1763177360.4617422,
+    "21": 17605465004.59656,
+    "22": 7501174566.343421,
+    "23": 1947356530.7154455,
+    "24": 33761781.61159577,
+    "25": 2592527954.9780273,
+    "26": 2965544099.482141,
+    "27": 0.0,
+    "28": 2350394647.232034,
+    "29": 4820797225.078963,
+    "3": 207113084.15216553,
+    "30": 4519689369.417773,
+    "31": 8161192863.05304,
+    "32": 1277589099.564588,
+    "33": 5073324158.085688,
+    "34": 6419982514.975247,
+    "35": 4331082004.467292,
+    "36": 1929869849.2804391,
+    "37": 3857317971.596903,
+    "38": 2119650903.3700187,
+    "39": 75123963.95105562,
+    "4": 46759545.70567196,
+    "40": 1656223335.2275908,
+    "41": 0.0,
+    "42": 18828804127.26408,
+    "43": 8165983178.501718,
+    "44": 1601673856.3822858,
+    "45": 939015133.7789125,
+    "46": 204245898.73552898,
+    "47": 4225626.432566204,
+    "48": 0.0,
+    "49": 49701818.51860349,
+    "5": 1535610915.8460958,
+    "50": 61626029.318020135,
+    "51": 630784705.8126439,
+    "52": 659019619.7488452,
+    "53": 2628221.3965961635,
+    "54": 8081985061.103975,
+    "55": 1835640424.961262,
+    "56": 23253986777.35871,
+    "57": 4917642484.93177,
+    "58": 766782970.4445455,
+    "59": 328302317.08943367,
+    "6": 3311330084.6080613,
+    "60": 38203936104.886406,
+    "61": 2834813493.8877234,
+    "62": 1453976925.227359,
+    "63": 4936235062.809386,
+    "64": 2885116934.6705694,
+    "65": 544867043.7535948,
+    "66": 34305538.99597754,
+    "67": 19609762.491855204,
+    "68": 626909598.8713828,
+    "69": 30449802.98125365,
+    "7": 25252597.749271713,
+    "70": 16217334.08293237,
+    "71": 720492608.3350871,
+    "72": 7951133670.908635,
+    "73": 7435650652.921879,
+    "74": 23469959594.60616,
+    "75": 307485750.15013427,
+    "76": 20813635550.06108,
+    "77": 8704315546.43599,
+    "78": 9257274176.557474,
+    "79": 1760243064.1393344,
+    "8": 366009371.4551528,
+    "80": 8937982978.737137,
+    "81": 51879191.77848718,
+    "82": 8165983178.501718,
+    "83": 0.0,
+    "84": 4006587.97408221,
+    "85": 107082662.20779122,
+    "86": 485766113.5705595,
+    "87": 743019950.7078847,
+    "88": 7295310076.349865,
+    "89": 4370927747.364747,
+    "9": 758586273.217771,
+    "90": 28709386.43805983,
+    "91": 0.0,
+    "92": 65839782.6260807,
+    "93": 262286017.66149923,
+    "94": 1037042946.7547342,
+    "95": 0.0,
+    "96": 1172867973.1568022,
+    "97": 54972788.3694012,
+    "98": 8165983178.501718,
+    "99": 13998681941.634409
+  },
+  "final_selected_sites": [
+    42,
+    46,
+    47
+  ],
+  "final_status": "OPTIMAL",
+  "fixed_route_state_arcs": 3613,
+  "method": "all_scenario_strategic_proxy_then_detailed_routing",
+  "proxy_return_to_base": false,
+  "scenario_count": 100,
+  "scenario_routing": [
+    {
+      "gap": 3.4817868698493144e-06,
+      "objective": 26980.198116991618,
+      "runtime": 1.5443248748779297,
+      "scenario": 0,
+      "selected_distance_state_arcs": 19,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.0007955623062827175,
+      "objective": 1987235691.6346333,
+      "runtime": 9.684180974960327,
+      "scenario": 1,
+      "selected_distance_state_arcs": 48,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.0005474468764218924,
+      "objective": 5132620869.370129,
+      "runtime": 7.381083965301514,
+      "scenario": 2,
+      "selected_distance_state_arcs": 67,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.003150373677133744,
+      "objective": 105445.55899079681,
+      "runtime": 120.03416705131531,
+      "scenario": 3,
+      "selected_distance_state_arcs": 63,
+      "status": "TIME_LIMIT"
+    },
+    {
+      "gap": 1.0591789150759863e-06,
+      "objective": 46390.11979529252,
+      "runtime": 1.7554779052734375,
+      "scenario": 4,
+      "selected_distance_state_arcs": 6,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.0012060572848128605,
+      "objective": 231876098.61430854,
+      "runtime": 120.03039598464966,
+      "scenario": 5,
+      "selected_distance_state_arcs": 70,
+      "status": "TIME_LIMIT"
+    },
+    {
+      "gap": 0.00021526999414808975,
+      "objective": 1828684626.4537108,
+      "runtime": 4.680452108383179,
+      "scenario": 6,
+      "selected_distance_state_arcs": 48,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 1.0992005342898718e-05,
+      "objective": 24621.381961615018,
+      "runtime": 1.7778689861297607,
+      "scenario": 7,
+      "selected_distance_state_arcs": 6,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.007646095370234836,
+      "objective": 71943086.01137306,
+      "runtime": 120.03152704238892,
+      "scenario": 8,
+      "selected_distance_state_arcs": 53,
+      "status": "TIME_LIMIT"
+    },
+    {
+      "gap": 0.0014486842965567642,
+      "objective": 91861592.07617638,
+      "runtime": 120.03281998634338,
+      "scenario": 9,
+      "selected_distance_state_arcs": 60,
+      "status": "TIME_LIMIT"
+    },
+    {
+      "gap": 0.00014676138285050683,
+      "objective": 844333758.7863804,
+      "runtime": 4.462479829788208,
+      "scenario": 10,
+      "selected_distance_state_arcs": 60,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.001500130222407086,
+      "objective": 115127.11522069277,
+      "runtime": 120.02577900886536,
+      "scenario": 11,
+      "selected_distance_state_arcs": 43,
+      "status": "TIME_LIMIT"
+    },
+    {
+      "gap": 0.0017602705227555328,
+      "objective": 270378740.6908431,
+      "runtime": 120.03779816627502,
+      "scenario": 12,
+      "selected_distance_state_arcs": 28,
+      "status": "TIME_LIMIT"
+    },
+    {
+      "gap": 0.00020315260991667623,
+      "objective": 686942183.6643022,
+      "runtime": 4.881054878234863,
+      "scenario": 13,
+      "selected_distance_state_arcs": 45,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.0006975979148647372,
+      "objective": 6310270470.419319,
+      "runtime": 2.717883825302124,
+      "scenario": 14,
+      "selected_distance_state_arcs": 51,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.0,
+      "objective": 0.0,
+      "runtime": 0.44066309928894043,
+      "scenario": 15,
+      "selected_distance_state_arcs": 0,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.0005648706414129338,
+      "objective": 1237595890.6160061,
+      "runtime": 7.008514165878296,
+      "scenario": 16,
+      "selected_distance_state_arcs": 65,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.0,
+      "objective": 0.0,
+      "runtime": 0.42619895935058594,
+      "scenario": 17,
+      "selected_distance_state_arcs": 0,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.001075117671074083,
+      "objective": 781169521.1250068,
+      "runtime": 120.03559398651123,
+      "scenario": 18,
+      "selected_distance_state_arcs": 54,
+      "status": "TIME_LIMIT"
+    },
+    {
+      "gap": 1.0104954468532602e-05,
+      "objective": 23191.46360194173,
+      "runtime": 1.959237813949585,
+      "scenario": 19,
+      "selected_distance_state_arcs": 19,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.0006973352807934427,
+      "objective": 949860583.0937397,
+      "runtime": 3.2104549407958984,
+      "scenario": 20,
+      "selected_distance_state_arcs": 30,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.000371490641499688,
+      "objective": 17605465004.572906,
+      "runtime": 4.270159959793091,
+      "scenario": 21,
+      "selected_distance_state_arcs": 61,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.0009929574315167848,
+      "objective": 5900956692.029422,
+      "runtime": 3.737645149230957,
+      "scenario": 22,
+      "selected_distance_state_arcs": 45,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.000838778575939629,
+      "objective": 1053468134.0956422,
+      "runtime": 4.516311168670654,
+      "scenario": 23,
+      "selected_distance_state_arcs": 36,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 3.112203156431957e-06,
+      "objective": 32767.984119696823,
+      "runtime": 1.8656160831451416,
+      "scenario": 24,
+      "selected_distance_state_arcs": 8,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.000551941979484046,
+      "objective": 1399648886.071788,
+      "runtime": 3.262143135070801,
+      "scenario": 25,
+      "selected_distance_state_arcs": 61,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.0002680705704031687,
+      "objective": 1640802424.312172,
+      "runtime": 3.144345998764038,
+      "scenario": 26,
+      "selected_distance_state_arcs": 34,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.0,
+      "objective": 0.0,
+      "runtime": 0.4788088798522949,
+      "scenario": 27,
+      "selected_distance_state_arcs": 0,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.00045297797758983924,
+      "objective": 1285046093.9845924,
+      "runtime": 4.651806831359863,
+      "scenario": 28,
+      "selected_distance_state_arcs": 34,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.0008662357062248155,
+      "objective": 3700952079.6049733,
+      "runtime": 3.5953710079193115,
+      "scenario": 29,
+      "selected_distance_state_arcs": 47,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.0006855789117928921,
+      "objective": 2916572316.4038258,
+      "runtime": 5.41025710105896,
+      "scenario": 30,
+      "selected_distance_state_arcs": 52,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.00033883535884749507,
+      "objective": 8160895698.876949,
+      "runtime": 2.3314809799194336,
+      "scenario": 31,
+      "selected_distance_state_arcs": 47,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.0009955112483802473,
+      "objective": 666304881.2180002,
+      "runtime": 3.779120922088623,
+      "scenario": 32,
+      "selected_distance_state_arcs": 35,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.0007129212059399163,
+      "objective": 3448273798.6666923,
+      "runtime": 3.337761878967285,
+      "scenario": 33,
+      "selected_distance_state_arcs": 63,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.0005076683034600704,
+      "objective": 4779768028.23968,
+      "runtime": 3.0148189067840576,
+      "scenario": 34,
+      "selected_distance_state_arcs": 45,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.00015130520599021842,
+      "objective": 2722616488.9610085,
+      "runtime": 6.998619794845581,
+      "scenario": 35,
+      "selected_distance_state_arcs": 57,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.0004493722238971921,
+      "objective": 1039758288.0202788,
+      "runtime": 4.144288063049316,
+      "scenario": 36,
+      "selected_distance_state_arcs": 38,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.00014490630031027514,
+      "objective": 2262456261.0352254,
+      "runtime": 8.24692702293396,
+      "scenario": 37,
+      "selected_distance_state_arcs": 67,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 8.395988280534989e-06,
+      "objective": 1110643148.668237,
+      "runtime": 6.340914964675903,
+      "scenario": 38,
+      "selected_distance_state_arcs": 56,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 2.730717442308844e-06,
+      "objective": 41131.12055047942,
+      "runtime": 1.9761409759521484,
+      "scenario": 39,
+      "selected_distance_state_arcs": 17,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.00034639889540181453,
+      "objective": 883809754.7932733,
+      "runtime": 3.4477651119232178,
+      "scenario": 40,
+      "selected_distance_state_arcs": 30,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.0,
+      "objective": 0.0,
+      "runtime": 0.4248771667480469,
+      "scenario": 41,
+      "selected_distance_state_arcs": 0,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.00012115056541045326,
+      "objective": 18829939584.45192,
+      "runtime": 4.46291708946228,
+      "scenario": 42,
+      "selected_distance_state_arcs": 36,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.0008634866881118985,
+      "objective": 7064268172.39456,
+      "runtime": 5.489023923873901,
+      "scenario": 43,
+      "selected_distance_state_arcs": 54,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 1.2253140196492164e-05,
+      "objective": 811191402.6057171,
+      "runtime": 5.123540878295898,
+      "scenario": 44,
+      "selected_distance_state_arcs": 50,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.0009748337121140556,
+      "objective": 447807061.2015396,
+      "runtime": 2.7780120372772217,
+      "scenario": 45,
+      "selected_distance_state_arcs": 26,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.002322803828809181,
+      "objective": 103406.28957768419,
+      "runtime": 120.05046081542969,
+      "scenario": 46,
+      "selected_distance_state_arcs": 59,
+      "status": "TIME_LIMIT"
+    },
+    {
+      "gap": 1.175506023773167e-06,
+      "objective": 1379.199942005758,
+      "runtime": 1.5762758255004883,
+      "scenario": 47,
+      "selected_distance_state_arcs": 1,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.0,
+      "objective": 0.0,
+      "runtime": 0.42951488494873047,
+      "scenario": 48,
+      "selected_distance_state_arcs": 0,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 7.605826917813815e-06,
+      "objective": 13234.98025043801,
+      "runtime": 1.8492131233215332,
+      "scenario": 49,
+      "selected_distance_state_arcs": 4,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 6.174911977685646e-06,
+      "objective": 60194.23781933252,
+      "runtime": 2.159083127975464,
+      "scenario": 50,
+      "selected_distance_state_arcs": 17,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 5.545965138342693e-08,
+      "objective": 260683834.71576464,
+      "runtime": 2.3436439037323,
+      "scenario": 51,
+      "selected_distance_state_arcs": 30,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.00039550357974805074,
+      "objective": 263016336.35794285,
+      "runtime": 2.787853956222534,
+      "scenario": 52,
+      "selected_distance_state_arcs": 42,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 2.3329849979990386e-05,
+      "objective": 691.3673456390549,
+      "runtime": 1.6212711334228516,
+      "scenario": 53,
+      "selected_distance_state_arcs": 1,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.0009565893919261661,
+      "objective": 7816038592.195126,
+      "runtime": 4.88306999206543,
+      "scenario": 54,
+      "selected_distance_state_arcs": 46,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.001180519818254733,
+      "objective": 711427327.2260954,
+      "runtime": 120.02077412605286,
+      "scenario": 55,
+      "selected_distance_state_arcs": 55,
+      "status": "TIME_LIMIT"
+    },
+    {
+      "gap": 0.0005697095040994398,
+      "objective": 23255757070.357758,
+      "runtime": 3.4972779750823975,
+      "scenario": 56,
+      "selected_distance_state_arcs": 33,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.0007056789354370706,
+      "objective": 3308654237.7739325,
+      "runtime": 2.9250540733337402,
+      "scenario": 57,
+      "selected_distance_state_arcs": 45,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.001891256436309789,
+      "objective": 362108888.8937529,
+      "runtime": 120.05946516990662,
+      "scenario": 58,
+      "selected_distance_state_arcs": 50,
+      "status": "TIME_LIMIT"
+    },
+    {
+      "gap": 0.0007471332690568844,
+      "objective": 92771.49548701006,
+      "runtime": 2.5817677974700928,
+      "scenario": 59,
+      "selected_distance_state_arcs": 48,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.00019492902060162557,
+      "objective": 38205071562.07403,
+      "runtime": 5.704572916030884,
+      "scenario": 60,
+      "selected_distance_state_arcs": 26,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 3.1563175739133896e-07,
+      "objective": 1523101951.2225063,
+      "runtime": 6.620213031768799,
+      "scenario": 61,
+      "selected_distance_state_arcs": 63,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.0008954438150284026,
+      "objective": 745924240.4816283,
+      "runtime": 3.3616058826446533,
+      "scenario": 62,
+      "selected_distance_state_arcs": 42,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.0005095923577391877,
+      "objective": 3304500218.2436934,
+      "runtime": 11.092017889022827,
+      "scenario": 63,
+      "selected_distance_state_arcs": 51,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.0005618734326303613,
+      "objective": 1600448958.5486326,
+      "runtime": 3.351323127746582,
+      "scenario": 64,
+      "selected_distance_state_arcs": 38,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 1.093183355356199e-06,
+      "objective": 228291866.77991873,
+      "runtime": 2.450043201446533,
+      "scenario": 65,
+      "selected_distance_state_arcs": 32,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 7.935882700838725e-06,
+      "objective": 22865.93298102525,
+      "runtime": 2.094589948654175,
+      "scenario": 66,
+      "selected_distance_state_arcs": 7,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 1.212469697307369e-06,
+      "objective": 18059.222289376437,
+      "runtime": 1.960075855255127,
+      "scenario": 67,
+      "selected_distance_state_arcs": 1,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.0008638379754530984,
+      "objective": 232190123.08744663,
+      "runtime": 4.098208904266357,
+      "scenario": 68,
+      "selected_distance_state_arcs": 54,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 5.506572460498448e-05,
+      "objective": 8129.145865610701,
+      "runtime": 1.740656852722168,
+      "scenario": 69,
+      "selected_distance_state_arcs": 5,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 9.387329890504033e-07,
+      "objective": 13537.417318828566,
+      "runtime": 1.6866610050201416,
+      "scenario": 70,
+      "selected_distance_state_arcs": 1,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 3.3882010194400277e-06,
+      "objective": 277365516.81190616,
+      "runtime": 5.228900909423828,
+      "scenario": 71,
+      "selected_distance_state_arcs": 43,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.0002205362347714223,
+      "objective": 6351192447.804605,
+      "runtime": 4.178073883056641,
+      "scenario": 72,
+      "selected_distance_state_arcs": 48,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.00012548596318266697,
+      "objective": 5831356949.606836,
+      "runtime": 2.9035439491271973,
+      "scenario": 73,
+      "selected_distance_state_arcs": 39,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.0003963908520591391,
+      "objective": 23477786941.74841,
+      "runtime": 7.130269765853882,
+      "scenario": 74,
+      "selected_distance_state_arcs": 60,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.022939291040745068,
+      "objective": 38799365.72028449,
+      "runtime": 120.05810403823853,
+      "scenario": 75,
+      "selected_distance_state_arcs": 54,
+      "status": "TIME_LIMIT"
+    },
+    {
+      "gap": 0.0007084206726485626,
+      "objective": 20813635550.044777,
+      "runtime": 7.176567077636719,
+      "scenario": 76,
+      "selected_distance_state_arcs": 58,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.0001982317664914025,
+      "objective": 8704315546.435644,
+      "runtime": 8.602724075317383,
+      "scenario": 77,
+      "selected_distance_state_arcs": 59,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 3.5347354922681e-05,
+      "objective": 9257274176.555803,
+      "runtime": 7.634606838226318,
+      "scenario": 78,
+      "selected_distance_state_arcs": 60,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 1.4509691402924396e-05,
+      "objective": 914474912.9674023,
+      "runtime": 4.168037176132202,
+      "scenario": 79,
+      "selected_distance_state_arcs": 39,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.0009926933071158891,
+      "objective": 8941691647.702782,
+      "runtime": 4.471091032028198,
+      "scenario": 80,
+      "selected_distance_state_arcs": 35,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 7.285557073244323e-07,
+      "objective": 33506.177433025834,
+      "runtime": 1.8080098628997803,
+      "scenario": 81,
+      "selected_distance_state_arcs": 5,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.0006146644446933945,
+      "objective": 7161360131.951306,
+      "runtime": 4.287093877792358,
+      "scenario": 82,
+      "selected_distance_state_arcs": 59,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.0,
+      "objective": 0.0,
+      "runtime": 0.40820789337158203,
+      "scenario": 83,
+      "selected_distance_state_arcs": 0,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 2.687156328998796e-05,
+      "objective": 1307.7501568576895,
+      "runtime": 1.8194029331207275,
+      "scenario": 84,
+      "selected_distance_state_arcs": 1,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 1.159876685883757e-06,
+      "objective": 59679.421237975635,
+      "runtime": 2.0379650592803955,
+      "scenario": 85,
+      "selected_distance_state_arcs": 17,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.003170332920440516,
+      "objective": 197517222.0848243,
+      "runtime": 120.04072999954224,
+      "scenario": 86,
+      "selected_distance_state_arcs": 58,
+      "status": "TIME_LIMIT"
+    },
+    {
+      "gap": 0.0001779959678591222,
+      "objective": 297809565.11275816,
+      "runtime": 10.434376955032349,
+      "scenario": 87,
+      "selected_distance_state_arcs": 83,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.0005143942392071134,
+      "objective": 6180995163.258706,
+      "runtime": 4.9756059646606445,
+      "scenario": 88,
+      "selected_distance_state_arcs": 27,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.0006769990633732062,
+      "objective": 2752980431.2879133,
+      "runtime": 3.258690118789673,
+      "scenario": 89,
+      "selected_distance_state_arcs": 45,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 1.1029341078326686e-06,
+      "objective": 17453.864220930896,
+      "runtime": 1.8839530944824219,
+      "scenario": 90,
+      "selected_distance_state_arcs": 1,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.0,
+      "objective": 0.0,
+      "runtime": 0.4180569648742676,
+      "scenario": 91,
+      "selected_distance_state_arcs": 0,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 3.7664971356891274e-05,
+      "objective": 66452.10741558098,
+      "runtime": 2.1560540199279785,
+      "scenario": 92,
+      "selected_distance_state_arcs": 12,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.014115211436420456,
+      "objective": 14250020.410968183,
+      "runtime": 120.02967882156372,
+      "scenario": 93,
+      "selected_distance_state_arcs": 48,
+      "status": "TIME_LIMIT"
+    },
+    {
+      "gap": 1.1095902014317112e-06,
+      "objective": 478565230.9671642,
+      "runtime": 4.631165027618408,
+      "scenario": 94,
+      "selected_distance_state_arcs": 45,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.0,
+      "objective": 0.0,
+      "runtime": 0.4485762119293213,
+      "scenario": 95,
+      "selected_distance_state_arcs": 0,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.0002395991052601399,
+      "objective": 586592092.1550577,
+      "runtime": 5.243147850036621,
+      "scenario": 96,
+      "selected_distance_state_arcs": 45,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 6.144893021420024e-06,
+      "objective": 30166.635553935503,
+      "runtime": 1.9381968975067139,
+      "scenario": 97,
+      "selected_distance_state_arcs": 9,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.00047723552625363963,
+      "objective": 7495383616.301951,
+      "runtime": 8.373430013656616,
+      "scenario": 98,
+      "selected_distance_state_arcs": 49,
+      "status": "OPTIMAL"
+    },
+    {
+      "gap": 0.00011299127950472215,
+      "objective": 13998681941.634409,
+      "runtime": 2.5659258365631104,
+      "scenario": 99,
+      "selected_distance_state_arcs": 29,
+      "status": "OPTIMAL"
+    }
+  ],
+  "strategic_proxy": {
+    "basing": [
+      [
+        "C-130J",
+        42,
+        15
+      ],
+      [
+        "C-130J",
+        47,
+        1
+      ],
+      [
+        "C-17",
+        42,
+        4
+      ],
+      [
+        "C-17",
+        46,
+        1
+      ],
+      [
+        "C-17",
+        47,
+        7
+      ],
+      [
+        "LCU-1700",
+        46,
+        8
+      ],
+      [
+        "M1083",
+        42,
+        60
+      ]
+    ],
+    "eta": 9022258977.86375,
+    "gap": 0.0003001223454110499,
+    "metadata": {
+      "delivery_variables": 82200,
+      "return_to_base": false,
+      "service_options": 41100,
+      "trip_variables": 41100
+    },
+    "objective": 18704272358.68833,
+    "runtime": 0.4562251567840576,
+    "selected_sites": [
+      42,
+      46,
+      47
+    ],
+    "status": "OPTIMAL"
+  }
+}
