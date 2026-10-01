@@ -520,6 +520,11 @@ def build_vehicle_params(
             "cruise_speed_km_day": cruise_speed,
             "cap_tons": float(vconfig["payload_kg"]) / 1000.0,
         }
+        if "max_leg_km" in vconfig:
+            # Optional per-type single-leg range cap, consumed by
+            # model_distance_state.py's _distance_network(). See EPF's
+            # config comment for why this exists (chat discussion 2026-10-01).
+            vehicle_types[vtype_name]["max_leg_km"] = float(vconfig["max_leg_km"])
         K_m[mode].append(vtype_name)
 
     return {
@@ -690,13 +695,76 @@ def build_stochastic_instance(
     vif_degradation_matrix = params.get("degradation_matrix", {})
 
 
-    _VIF_THETA_PLACEHOLDER = 1.0e4
-    vif_node_handling_capacity = {
-        (i, m): _VIF_THETA_PLACEHOLDER for i in nodes for m in modes
-    }
-    vif_node_handling_bonus = {
-        (i, m): _VIF_THETA_PLACEHOLDER for i in ppl_nodes for m in modes
-    }
+    # --- Node handling capacity (Theta): baseline from physical infrastructure
+    # rating (S/A/L/R -- the same rating that gates arc existence), PPL
+    # activation bonus from the tier-based asset/sortie/discharge/road tables
+    # already used to build the modal arc CSVs. See
+    # handling_capacity_bonus_fraction in model_parameters.yaml for the
+    # rationale and caveats on the bonus split.
+    _air_cfg = params["modal_capacity"]["air"]
+    _sea_cfg = params["modal_capacity"]["maritime"]
+    _land_cfg = params["modal_capacity"]["terrestrial"]
+    _bonus_fraction = params.get(
+        "handling_capacity_bonus_fraction", {"air": 0.15, "sea": 0.15, "land": 0.25}
+    )
+    _lcu_payload_mt = float(params["vehicles"]["LCU-1700"]["payload_kg"]) / 1000.0
+    _m1083_payload_mt = float(params["vehicles"]["M1083"]["payload_kg"]) / 1000.0
+    _window_days = float(_land_cfg.get("window_days", 3))
+    # Ratings below the mode's arc-existence min_rating (2 for both air and
+    # sea) never carry arcs, so their handling capacity is immaterial; only
+    # rating 2/3 map to a tier-equivalent throughput.
+    _air_rating_tier = {3: "PPL-1", 2: "PPL-2"}
+    _sea_rating_tier = {3: "PPL-1", 2: "PPL-2"}
+
+    def _air_tier_arrivals(tier: str) -> float:
+        aircraft = _air_cfg["aircraft_type"].get(tier)
+        if not aircraft:
+            return 0.0
+        return float(_air_cfg["assets"].get(tier, 0)) * float(
+            _air_cfg["sorties_per_window"][aircraft]
+        )
+
+    def _sea_tier_arrivals(tier: str) -> float:
+        vessel = _sea_cfg["vessel_type"].get(tier)
+        if not vessel or vessel == "none":
+            return 0.0
+        return (
+            float(_sea_cfg["assets"].get(tier, 0))
+            * float(_sea_cfg["discharge_mt_per_window"][vessel])
+        ) / _lcu_payload_mt
+
+    def _land_baseline_arrivals(l_rating: int, r_rating: int) -> float:
+        road = float(_land_cfg["road_mt_per_day"].get(l_rating, 0))
+        rail = float(_land_cfg["rail_mt_per_day"].get(r_rating, 0)) if r_rating else 0.0
+        return (road + rail) * _window_days / _m1083_payload_mt
+
+    vif_node_handling_capacity = {}
+    for i in nodes:
+        loc = locations[i]
+        air_tier_key = _air_rating_tier.get(loc["A"])
+        sea_tier_key = _sea_rating_tier.get(loc["S"])
+        vif_node_handling_capacity[i, "air"] = (
+            _air_tier_arrivals(air_tier_key) if air_tier_key else 0.0
+        )
+        vif_node_handling_capacity[i, "sea"] = (
+            _sea_tier_arrivals(sea_tier_key) if sea_tier_key else 0.0
+        )
+        vif_node_handling_capacity[i, "land"] = _land_baseline_arrivals(
+            loc["L"], loc["R"]
+        )
+
+    vif_node_handling_bonus = {}
+    for i in ppl_nodes:
+        tier = locations[i]["tier"]
+        vif_node_handling_bonus[i, "air"] = (
+            _bonus_fraction["air"] * _air_tier_arrivals(tier)
+        )
+        vif_node_handling_bonus[i, "sea"] = (
+            _bonus_fraction["sea"] * _sea_tier_arrivals(tier)
+        )
+        vif_node_handling_bonus[i, "land"] = (
+            _bonus_fraction["land"] * vif_node_handling_capacity[i, "land"]
+        )
 
     # --- Demand / inventory / cost parameters ---
     demand = build_fixed_demand(locations, commodities, scenarios, params)

@@ -1,0 +1,51 @@
+node_id,node_name,has_sea,has_air,has_land,T_sea_to_air,cost_sea_to_air,T_sea_to_land,cost_sea_to_land,T_air_to_land,cost_air_to_land,T_land_to_sea,cost_land_to_sea,T_land_to_air,cost_land_to_air,T_air_to_sea,cost_air_to_sea
+1,Tokyo / Yokosuka,True,True,True,1500000,3.0,1500000,0.5,1500000,0.8,1500000,0.7,1500000,1.2,1500000,2.0
+2,Osaka,True,True,True,1500000,3.0,1500000,0.5,1500000,0.8,1500000,0.7,1500000,1.2,1500000,2.0
+3,Sapporo,True,True,True,1500000,3.0,1000000,0.5,1000000,0.8,1000000,0.7,1000000,1.2,1500000,2.0
+4,Fukuoka / Sasebo,True,True,True,1500000,3.0,1500000,0.5,1500000,0.8,1500000,0.7,1500000,1.2,1500000,2.0
+5,Nagoya,True,True,True,1500000,3.0,1500000,0.5,1500000,0.8,1500000,0.7,1500000,1.2,1500000,2.0
+6,Sydney,True,True,True,1500000,3.0,1500000,0.5,1500000,0.8,1500000,0.7,1500000,1.2,1500000,2.0
+7,Melbourne,True,True,True,1500000,3.0,1500000,0.5,1500000,0.8,1500000,0.7,1500000,1.2,1500000,2.0
+8,Brisbane,True,True,True,1500000,3.0,1500000,0.5,1500000,0.8,1500000,0.7,1500000,1.2,1500000,2.0
+9,Perth,True,True,False,1500000,3.0,0,,0,,0,,0,,1500000,2.0
+10,Adelaide,True,True,True,1500000,3.0,1000000,0.5,1000000,0.8,1000000,0.7,1000000,1.2,1500000,2.0
+11,Darwin,True,True,True,1500000,3.0,1000000,0.5,1000000,0.8,1000000,0.7,1000000,1.2,1500000,2.0
+12,Wellington,False,True,False,0,,0,,0,,0,,0,,0,
+13,Auckland,False,True,False,0,,0,,0,,0,,0,,0,
+14,Noumea,False,True,False,0,,0,,0,,0,,0,,0,
+15,Port Moresby,False,True,False,0,,0,,0,,0,,0,,0,
+16,Honiara,False,True,False,0,,0,,0,,0,,0,,0,
+17,Suva,True,True,False,1500000,3.0,0,,0,,0,,0,,1500000,2.0
+18,Apia,True,True,False,1500000,3.0,0,,0,,0,,0,,1500000,2.0
+19,Nuku'alofa,True,True,False,1500000,3.0,0,,0,,0,,0,,1500000,2.0
+20,Majuro,True,True,False,1000000,3.0,0,,0,,0,,0,,1000000,2.0
+21,Tarawa,False,True,False,0,,0,,0,,0,,0,,0,
+22,Palikir,False,True,False,0,,0,,0,,0,,0,,0,
+23,Yaren,True,True,False,1000000,3.0,0,,0,,0,,0,,1000000,2.0
+24,Koror,True,True,False,1000000,3.0,0,,0,,0,,0,,1000000,2.0
+25,Jayapura,False,True,False,0,,0,,0,,0,,0,,0,
+26,Davao,False,True,False,0,,0,,0,,0,,0,,0,
+27,Manila,True,True,False,1500000,3.0,0,,0,,0,,0,,1500000,2.0
+28,Cebu,False,True,False,0,,0,,0,,0,,0,,0,
+29,Jakarta,True,True,False,1500000,3.0,0,,0,,0,,0,,1500000,2.0
+30,Denpasar,False,True,False,0,,0,,0,,0,,0,,0,
+31,Bandar Seri Begawan,False,True,False,0,,0,,0,,0,,0,,0,
+32,Kota Kinabalu,False,True,False,0,,0,,0,,0,,0,,0,
+33,Kuching,False,True,False,0,,0,,0,,0,,0,,0,
+34,Ho Chi Minh City,False,True,True,0,,0,,1500000,0.8,0,,1500000,1.2,0,
+35,Hanoi,False,True,True,0,,0,,1000000,0.8,0,,1000000,1.2,0,
+36,Vientiane,False,True,True,0,,0,,500000,0.8,0,,500000,1.2,0,
+37,Phnom Penh,False,True,True,0,,0,,1000000,0.8,0,,1000000,1.2,0,
+38,Singapore,True,True,False,1500000,3.0,0,,0,,0,,0,,1500000,2.0
+39,Da Nang,True,True,True,1500000,3.0,1000000,0.5,1000000,0.8,1000000,0.7,1000000,1.2,1500000,2.0
+40,Makassar,False,True,False,0,,0,,0,,0,,0,,0,
+41,Medan,False,True,False,0,,0,,0,,0,,0,,0,
+42,Honolulu,True,True,False,1500000,3.0,0,,0,,0,,0,,1500000,2.0
+43,Bangkok,False,True,True,0,,0,,1500000,0.8,0,,1500000,1.2,0,
+44,Yangon,False,True,True,0,,0,,500000,0.8,0,,500000,1.2,0,
+45,Taipei,True,True,False,1500000,3.0,0,,0,,0,,0,,1500000,2.0
+46,Seoul / Busan,True,True,False,1500000,3.0,0,,0,,0,,0,,1500000,2.0
+47,Guam (Apra),True,True,False,1500000,3.0,0,,0,,0,,0,,1500000,2.0
+48,Shanghai,False,False,False,0,,0,,0,,0,,0,,0,
+49,Guangzhou,False,False,False,0,,0,,0,,0,,0,,0,
+50,Chengdu,False,False,False,0,,0,,0,,0,,0,,0,

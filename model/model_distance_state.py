@@ -66,11 +66,27 @@ def _distance_network(
                 f"smaller than distance_step_km={step_km}"
             )
 
+        # Optional per-type single-leg range cap, distinct from the shared
+        # network's arc-existence threshold (modal_capacity.<mode>.max_distance_km,
+        # which governs whether an arc exists in the network at all, for every
+        # vehicle of that mode). max_leg_km exists for vehicle types whose real
+        # unrefueled range is shorter than that shared ceiling -- e.g. EPF's
+        # ~2,222 km range vs. the sea network's 4,500 km ceiling, which is
+        # correct for T-AKR/T-AKE/LCU-1700 but would let EPF be assigned a
+        # single leg nearly double what it can actually sail (chat discussion
+        # 2026-10-01). Checked against raw physical distance, not physical+pi_k,
+        # since pi_k is a turnaround-time proxy, not distance actually travelled.
+        max_leg_km = data.get("max_leg_km")
+
         arc_units = {}
         outgoing = defaultdict(list)
+        excluded_by_leg_cap = 0
         for i, j in modal_arcs[mode]:
-            physical = float(modal_arc_distance.get(mode, {}).get((i, j), 0.0))
-            physical += float(data["pi_k"])
+            raw_distance = float(modal_arc_distance.get(mode, {}).get((i, j), 0.0))
+            if max_leg_km is not None and raw_distance > float(max_leg_km):
+                excluded_by_leg_cap += 1
+                continue
+            physical = raw_distance + float(data["pi_k"])
             if physical <= 0.0:
                 raise ValueError(
                     f"distance-state arcs must consume positive distance; "
@@ -79,6 +95,14 @@ def _distance_network(
             units = max(1, int(math.ceil(physical / step_km - 1e-12)))
             arc_units[i, j] = units
             outgoing[i].append((j, units))
+
+        if max_leg_km is not None and excluded_by_leg_cap:
+            print(
+                f"[distance-state] {k}: max_leg_km={max_leg_km} excluded "
+                f"{excluded_by_leg_cap} of {len(modal_arcs[mode])} {mode} arcs "
+                f"as single legs longer than its real unrefueled range",
+                flush=True,
+            )
 
         # All eligible bases are possible sources because basing is optimized.
         reached = {(int(j), 0) for j in data["J_k"]}

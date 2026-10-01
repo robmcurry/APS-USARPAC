@@ -30,6 +30,7 @@ import os
 import sys
 import time
 from collections import defaultdict
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from typing import Any, Dict, List, Sequence, Tuple
 
 import gurobipy as gp
@@ -104,6 +105,9 @@ def _solver_params(
         "MIPGap": float(mip_gap),
         "CutPasses": 1,
         "DegenMoves": 0,
+        # See matching note in vif_staged_solve.py -- prevents OOM kills on
+        # this memory-constrained machine by spilling to disk instead.
+        "NodefileStart": 2.0,
     }
     if mip_focus is not None:
         params["MIPFocus"] = int(mip_focus)
@@ -511,6 +515,49 @@ def _dispose(results: Dict[str, Any]) -> None:
         results["model"].dispose()
 
 
+def _solve_scenario_routing(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Stage-2 worker: solve one scenario's detailed routing MIP.
+
+    Runs in its own process (submitted via ProcessPoolExecutor), so it must
+    be self-contained -- no Gurobi Model/Var objects cross the process
+    boundary, only plain picklable data in and out. ``threads`` caps each
+    worker's internal Gurobi thread count so N parallel workers don't each
+    try to claim every core.
+    """
+    w = payload["scenario"]
+    results = solve_stochastic_cvar(
+        payload["scenario_instance"],
+        vehicle_formulation="distance_state",
+        verbose=payload["verbose"],
+        vif_solve_config={
+            "distance_buckets": int(payload["distance_buckets"]),
+            "fix": payload["fixed_strategy"],
+            "params": _solver_params(
+                payload["scenario_time"],
+                payload["mip_gap"],
+                mip_focus=1,
+            ) | {"Threads": int(payload["threads"])},
+        },
+    )
+    _require_solution(results, f"scenario {w} routing")
+    model = results["model"]
+    routing_update = {
+        key: int(round(var.X))
+        for key, var in results["variables"]["n"].items()
+        if var.X > 0.5
+    }
+    summary = {
+        "scenario": w,
+        "status": results["status"],
+        "objective": results["objective_value"],
+        "gap": model.MIPGap if model.IsMIP and model.SolCount else 0.0,
+        "runtime": model.Runtime,
+        "selected_distance_state_arcs": len(results["vehicle_arcs"]),
+    }
+    _dispose(results)
+    return {"scenario": w, "routing_update": routing_update, "summary": summary}
+
+
 def solve_staged_proxy_vif(
     instance: Dict[str, Any],
     proxy_time: float = 1200.0,
@@ -520,6 +567,7 @@ def solve_staged_proxy_vif(
     distance_buckets: int = 16,
     return_to_base: bool = False,
     verbose: bool = True,
+    workers: int = None,
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     """Run compact strategic proxy, detailed routing, and final CVaR LP."""
     started = time.time()
@@ -552,38 +600,57 @@ def solve_staged_proxy_vif(
     }
     _dispose(proxy_results)
 
-    print("[stage 2/3] detailed fixed-strategy scenario routing", flush=True)
     fixed_strategy = {"p": p_values, "b": b_values}
     routing_values: Dict[Tuple, int] = {}
     scenario_summaries = []
-    for position, w in enumerate(instance["scenarios"], start=1):
-        print(f"  scenario {w} ({position}/{len(instance['scenarios'])})", flush=True)
-        results = solve_stochastic_cvar(
-            _subset_instance(instance, [w]),
-            vehicle_formulation="distance_state",
-            verbose=verbose,
-            vif_solve_config={
-                "distance_buckets": int(distance_buckets),
-                "fix": fixed_strategy,
-                "params": _solver_params(scenario_time, mip_gap, mip_focus=1),
-            },
-        )
-        _require_solution(results, f"scenario {w} routing")
-        routing_values.update({
-            key: int(round(var.X))
-            for key, var in results["variables"]["n"].items()
-            if var.X > 0.5
-        })
-        model = results["model"]
-        scenario_summaries.append({
+    scenario_ids = list(instance["scenarios"])
+    worker_count = max(1, min(int(workers) if workers else (os.cpu_count() or 1), len(scenario_ids)))
+    # Each worker solves its own single-scenario MIP; cap Gurobi's internal
+    # thread count per worker so `worker_count` parallel processes don't each
+    # try to claim every core on the machine.
+    threads_per_worker = max(1, (os.cpu_count() or 1) // worker_count)
+    print(
+        f"[stage 2/3] detailed fixed-strategy scenario routing "
+        f"({len(scenario_ids)} scenarios, {worker_count} parallel workers, "
+        f"{threads_per_worker} Gurobi thread(s) each)",
+        flush=True,
+    )
+    payloads = [
+        {
             "scenario": w,
-            "status": results["status"],
-            "objective": results["objective_value"],
-            "gap": model.MIPGap if model.IsMIP and model.SolCount else 0.0,
-            "runtime": model.Runtime,
-            "selected_distance_state_arcs": len(results["vehicle_arcs"]),
-        })
-        _dispose(results)
+            "scenario_instance": _subset_instance(instance, [w]),
+            "fixed_strategy": fixed_strategy,
+            "distance_buckets": distance_buckets,
+            "scenario_time": scenario_time,
+            "mip_gap": mip_gap,
+            "threads": threads_per_worker,
+            "verbose": verbose,
+        }
+        for w in scenario_ids
+    ]
+    if worker_count == 1:
+        # Serial fallback (workers=1, or a single-scenario run): avoids
+        # process-pool overhead and keeps stack traces readable while
+        # debugging.
+        completed = [_solve_scenario_routing(payload) for payload in payloads]
+    else:
+        completed = []
+        with ProcessPoolExecutor(max_workers=worker_count) as pool:
+            futures = {
+                pool.submit(_solve_scenario_routing, payload): payload["scenario"]
+                for payload in payloads
+            }
+            done = 0
+            for future in as_completed(futures):
+                w = futures[future]
+                result = future.result()
+                done += 1
+                print(f"  scenario {w} done ({done}/{len(scenario_ids)})", flush=True)
+                completed.append(result)
+    for result in completed:
+        routing_values.update(result["routing_update"])
+        scenario_summaries.append(result["summary"])
+    scenario_summaries.sort(key=lambda entry: entry["scenario"])
 
     print(
         "[stage 3/3] full CVaR allocation LP with strategy and routes fixed",
@@ -652,6 +719,16 @@ def main() -> None:
     )
     parser.add_argument("--quiet", action="store_true")
     parser.add_argument(
+        "--workers",
+        type=int,
+        default=None,
+        help=(
+            "Parallel worker processes for Stage 2 (one scenario routing "
+            "MIP per worker). Defaults to os.cpu_count(). Pass 1 to force "
+            "the old sequential behavior."
+        ),
+    )
+    parser.add_argument(
         "--output-dir", default=os.path.join("output", "vif_staged_proxy")
     )
     args = parser.parse_args()
@@ -659,6 +736,8 @@ def main() -> None:
         parser.error("--scenarios must be positive")
     if args.distance_buckets <= 0:
         parser.error("--distance-buckets must be positive")
+    if args.workers is not None and args.workers <= 0:
+        parser.error("--workers must be positive")
 
     params = copy.deepcopy(load_parameters())
     scenario_count = args.scenarios or int(params["num_scenarios"])
@@ -683,6 +762,7 @@ def main() -> None:
         distance_buckets=args.distance_buckets,
         return_to_base=args.proxy_return_to_base,
         verbose=not args.quiet,
+        workers=args.workers,
     )
 
     os.makedirs(args.output_dir, exist_ok=True)

@@ -248,6 +248,23 @@ transportation:
   # case this is wired back up; see consolidation note at top of file.
   cost_per_unit_km: 0.0001
 
+# Node handling-capacity (Theta) PPL-activation bonus, as a fraction of the
+# baseline rating-derived throughput. Baseline Theta_{i,m} carries the
+# dominant physical-throughput ceiling (S/A/L/R rating -- the same rating
+# that gates arc existence); establishing a PPL adds only the operational
+# increment on top -- forward-postured MHE, personnel, and throughput
+# coordination -- not a rebuilt port or airfield. Land gets the largest
+# bump because Army logistics units (trucks, drivers, convoy security,
+# traffic control) are the organic competency a PPL siting decision most
+# directly brings; sea/air infrastructure (berths, runways) is fixed and
+# largely unaffected by Army presence. Chosen by reasoned default in chat
+# on 2026-09-29, not derived from a historical/doctrinal study -- flagged
+# pending SME validation, same status as degradation_matrix and phi_r above.
+handling_capacity_bonus_fraction:
+  air: 0.15
+  sea: 0.15
+  land: 0.25
+
 # intermodal transfer cost multipliers theta[m1][m2], applied per unit of
 # commodity transferred between modes at a node (dimensionless, consistent
 # with modal arc cost scale). Migrated from hardcoded values in
@@ -400,6 +417,67 @@ vehicles:
     capacity:
       food: 285594
       water: 10281
+  # T-AKR, T-AKE, EPF added 2026-09-30 to build out the sea fleet beyond a
+  # single vehicle type (chat discussion) -- also resolves a pre-existing
+  # mismatch where modal_capacity.maritime's Theta-bonus tier table already
+  # referenced TAKR/TAKE vessel types that had no corresponding vehicle_types
+  # entry. Speed/payload are sourced (see citations below); fleet_size,
+  # basing_tiers, and min_rating_value are planning assumptions pending a
+  # binding-constraint sensitivity sweep, not sourced facts.
+  T-AKR:
+    # Watson-class LMSR: 24 kt, ~13,000 long-ton cargo capacity.
+    # https://www.navy.mil/Resources/Fact-Files/Display-FactFiles/Article/2226172/large-medium-speed-roll-onroll-off-ships-t-akr/
+    # https://www.naval-technology.com/projects/takr/
+    mode: sea
+    fleet_size: 3
+    min_rating_field: S
+    min_rating_value: 3
+    basing_tiers: ["PPL-1"]
+    cruise_speed_km_day: 1067
+    turnaround_hours: 24
+    payload_kg: 13200000
+    capacity:
+      food: 24446400
+      water: 880440
+  T-AKE:
+    # Lewis and Clark-class dry cargo/ammunition ship: ~20 kt, ~7,000 MT cargo.
+    # https://www.navy.mil/Resources/Fact-Files/Display-FactFiles/Article/2211797/dry-cargoammunition-ships-t-ake/
+    mode: sea
+    fleet_size: 3
+    min_rating_field: S
+    min_rating_value: 2
+    basing_tiers: ["PPL-1", "PPL-2"]
+    cruise_speed_km_day: 889
+    turnaround_hours: 18
+    payload_kg: 7000000
+    capacity:
+      food: 12964000
+      water: 466900
+  EPF:
+    # Spearhead-class Expeditionary Fast Transport: 35 kt sustained (43 kt
+    # sprint max, not used here), 600 short tons, 3.83 m draft -- the
+    # austere-port-capable option, deliberately given the network's lowest
+    # sea rating floor (S>=2, which is the arc-existence minimum for any sea
+    # vehicle) and no PPL-tier restriction, unlike T-AKR/T-AKE.
+    # Real unrefueled range is only ~1,200 nm (~2,222 km) -- shorter than the
+    # sea network's shared 4,500 km arc-existence ceiling (correct for
+    # T-AKR/T-AKE/LCU-1700, too permissive for EPF). max_leg_km caps any
+    # single EPF leg at its real range; the model's 3-day cumulative distance
+    # budget still assumes refueling *between* separate legs, same
+    # simplification already used for C-17 (chat discussion 2026-09-30,
+    # max_leg_km fix added 2026-10-01).
+    # https://en.wikipedia.org/wiki/Spearhead-class_expeditionary_fast_transport
+    mode: sea
+    fleet_size: 6
+    min_rating_field: S
+    min_rating_value: 2
+    cruise_speed_km_day: 1556
+    turnaround_hours: 4
+    max_leg_km: 2222
+    payload_kg: 544300
+    capacity:
+      food: 1008076
+      water: 36307
   M1083:
     mode: land
     fleet_size: 60
@@ -411,3 +489,20 @@ vehicles:
     capacity:
       food: 8400
       water: 302
+  PLS:
+    # M1075A1 Palletized Load System: 62 mph (100 km/h), 14,965 kg single
+    # flatrack payload (truck alone, no M1076 trailer). Requires a better
+    # road rating than M1083 (L>=2 vs L>=1) -- the intended tradeoff against
+    # M1083, same pattern as C-17 vs C-130J. Added 2026-09-30 (chat
+    # discussion) to build out the land fleet beyond a single vehicle type.
+    # https://www.militarytoday.com/trucks/oshkosh_pls.htm
+    mode: land
+    fleet_size: 24
+    min_rating_field: L
+    min_rating_value: 2
+    cruise_speed_km_day: 2400
+    turnaround_hours: 1
+    payload_kg: 14965
+    capacity:
+      food: 27725
+      water: 998
