@@ -222,6 +222,16 @@ P_max: 3
 inventory_disruption:
   # if node severity reaches or exceeds this value the node cannot release inventory
   # models the reality that a severely hit site cannot function as a supply origin
+  #
+  # WARNING (audit 2026-10-01): this value is NOT read by the distance-state
+  # model. build_inventory_availability() in model/input_builder.py uses it to
+  # produce instance["inventory_availability"], but model_distance_state.py
+  # never consumes that key -- it computes node availability itself with a
+  # HARDCODED threshold of severity >= 1.0 (model_distance_state.py, the `a`
+  # dict). That is 5x more aggressive than the value below. The hardcoded 1.0
+  # is what the paper documents (eq:availability), so the code is correct and
+  # this knob is the orphan -- but changing it has zero effect on any
+  # distance-state run. Do not tune it expecting a result.
   cutoff_severity: 5.0
   safety_stock:
     # fraction of inventory held back as safety stock at each active site
@@ -380,8 +390,52 @@ vehicle_formulation: "aggregate"
 # at top of file): model/model_config.yaml was never loaded by load_parameters(),
 # so has_vehicles was always False and the model always ran in its
 # non-vehicle-extended mode until this consolidation.
+# DUTY-FACTOR CONVENTION for cruise_speed_km_day (documented 2026-10-01 after
+# an audit found it was being applied inconsistently):
+#   cruise_speed_km_day is NOT max speed x 24 h. It is an *effective* daily
+#   distance that bakes in an implicit operational duty factor -- crew duty
+#   limits, maintenance, fuel stops, convoy pacing. The factors in use are:
+#     air   ~0.5-0.6 of max cruise  (C-17 486 of ~830 km/h; C-130J 327 of ~640)
+#     land   0.50    of max road speed (~12 h driving/day: M1083, PLS)
+#     sea    1.00    of cruise -- ships genuinely do steam 24/7 on watch
+#                    rotations, so no discount is applied (LCU-1700 is the
+#                    exception at ~0.80, inherited from the original config)
+#   If you add a vehicle, pick the factor for its mode and say so inline.
+#   Getting this wrong is silent: it does not error, it just makes one
+#   platform look faster than another for no physical reason.
+#
+# PAYLOAD-RANGE ASSUMPTION (decided 2026-10-01, option 1 of 4 considered):
+#   Real transport aircraft and ships trade payload against range along a
+#   continuous curve -- a C-17 carries 170,900 lb for ~2,900 nm, but only
+#   130,000 lb for ~5,200 nm, nearly double the reach for 24% less load.
+#   This model does NOT represent that curve. Each vehicle gets ONE
+#   (payload, range) point: payload_kg is max payload, and max_leg_km is
+#   the real range AT THAT max payload.
+#
+#   This is deliberately the CONSERVATIVE corner of the curve. It assumes
+#   every sortie flies max-loaded, so it understates what a partially
+#   loaded aircraft could reach. For a risk-averse posture model that bias
+#   is the safe direction -- it will never claim reach the fleet does not
+#   have, though it may miss postures that a lightly loaded long-range
+#   sortie would make viable.
+#
+#   Alternatives considered and deferred: a piecewise payload-range curve
+#   (needs the vehicle-arc variable to carry a payload-regime index --
+#   a formulation change); or splitting each aircraft into heavy/short and
+#   light/long pseudo-types sharing one airframe pool (needs a new
+#   constraint coupling b across the pair, since each type currently has an
+#   independent sum_j b_kj = F_k). Revisit if results turn out sensitive to
+#   long-range light-load missions.
 vehicles:
   C-17:
+    # max_leg_km added 2026-10-01: payload_kg here (77,500 kg = 170,900 lb)
+    # is *exactly* max payload, at which the real unrefueled range is only
+    # ~2,900 nm = 5,371 km. The shared air arc ceiling is 6,000 km, so 11%
+    # of air arcs were reachable in the model but not in reality. Note this
+    # is a point fix on a curve the model does not represent: a C-17 at
+    # 130,000 lb flies ~5,200 nm, nearly double. See the PAYLOAD-RANGE
+    # ASSUMPTION note at the top of this vehicles: block.
+    # https://man.fas.org/dod-101/sys/ac/c-17.htm
     mode: air
     fleet_size: 12
     min_rating_field: A
@@ -389,11 +443,21 @@ vehicles:
     basing_tiers: ["PPL-1"]
     cruise_speed_km_day: 11662
     turnaround_hours: 2
+    max_leg_km: 5371
     payload_kg: 77500
     capacity:
       food: 143519
       water: 5167
   C-130J:
+    # max_leg_km added 2026-10-01. payload_kg here (19,051 kg = 42,000 lb)
+    # is the C-130J-30 max figure, so the closest sourced range point is the
+    # -30 at 40,000 lb: 2,390 nm = 4,426 km. The shared air arc ceiling is
+    # 6,000 km, so 32% of air arcs were reachable in the model but not in
+    # reality -- the same bug class as EPF, at similar magnitude. This is the
+    # GENEROUS end: at the standard 34,000 lb normal-payload figure the real
+    # range is 1,800 nm = 3,334 km, which would exclude 53% of air arcs.
+    # Tighten if the modeled payload is revised downward.
+    # https://www.af.mil/About-Us/Fact-Sheets/Display/Article/1555054/c-130-hercules/
     mode: air
     fleet_size: 16
     min_rating_field: A
@@ -401,6 +465,7 @@ vehicles:
     basing_tiers: ["PPL-1"]
     cruise_speed_km_day: 7840
     turnaround_hours: 2
+    max_leg_km: 4426
     payload_kg: 19051
     capacity:
       food: 35280
@@ -490,17 +555,20 @@ vehicles:
       food: 8400
       water: 302
   PLS:
-    # M1075A1 Palletized Load System: 62 mph (100 km/h), 14,965 kg single
-    # flatrack payload (truck alone, no M1076 trailer). Requires a better
-    # road rating than M1083 (L>=2 vs L>=1) -- the intended tradeoff against
-    # M1083, same pattern as C-17 vs C-130J. Added 2026-09-30 (chat
-    # discussion) to build out the land fleet beyond a single vehicle type.
+    # M1075A1 Palletized Load System: 62 mph (100 km/h) max road speed,
+    # 14,965 kg single flatrack payload (truck alone, no M1076 trailer).
+    # Requires a better road rating than M1083 (L>=2 vs L>=1) -- the
+    # intended tradeoff against M1083, same pattern as C-17 vs C-130J.
+    # Added 2026-09-30; speed corrected 2026-10-01 (see duty-factor note
+    # at the top of this vehicles: block -- was 2400 km/day, i.e. 24 h/day
+    # of continuous driving at max road speed, which made PLS look 2.15x
+    # faster than M1083 when it is really ~6% faster).
     # https://www.militarytoday.com/trucks/oshkosh_pls.htm
     mode: land
     fleet_size: 24
     min_rating_field: L
     min_rating_value: 2
-    cruise_speed_km_day: 2400
+    cruise_speed_km_day: 1200   # 0.50 duty factor x 100 km/h x 24 h
     turnaround_hours: 1
     payload_kg: 14965
     capacity:
