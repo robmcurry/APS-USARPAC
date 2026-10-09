@@ -2,3 +2,5 @@ __pycache__/
 *.pyc
 gurobi.log
 output/
+.DS_Store
+*.pkl
