@@ -23,6 +23,7 @@ Run from the aps_usarpac project root, for example:
 import argparse
 import copy
 import json
+import math
 import os
 import sys
 import time
@@ -413,6 +414,17 @@ def main() -> None:
     parser.add_argument("--scenarios", type=int, default=None)
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--alpha", type=float, default=1.0)
+    parser.add_argument(
+        "--beta",
+        type=float,
+        default=None,
+        help=(
+            "CVaR confidence level, overriding config beta. The objective "
+            "averages the worst (1-beta) share of the scenario distribution, "
+            "so beta=0.9 optimizes against the worst 10%%. Defaults to the "
+            "configured value."
+        ),
+    )
     parser.add_argument("--quiet", action="store_true")
     parser.add_argument(
         "--workers",
@@ -437,10 +449,31 @@ def main() -> None:
         parser.error("--distance-buckets must be positive")
     if args.workers is not None and args.workers <= 0:
         parser.error("--workers must be positive")
+    if args.beta is not None and not 0.0 < args.beta < 1.0:
+        parser.error("--beta must lie strictly between 0 and 1")
 
     params = copy.deepcopy(load_parameters())
+    if args.beta is not None:
+        params["beta"] = float(args.beta)
     scenario_count = args.scenarios or int(params["num_scenarios"])
     seed = args.seed if args.seed is not None else int(params["seed"])
+
+    # The CVaR tail is resolved by however many strategic scenarios fall into
+    # the worst (1-beta) share of the subset.  Stage 1A renormalizes the subset
+    # weights, so a small subset at a high beta silently averages one or two
+    # scenarios and the "risk-averse" solve stops being meaningful.  Warn
+    # rather than fail: the run is still valid, it just cannot resolve a tail.
+    beta_value = float(params.get("beta", 0.9))
+    tail_scenarios = (1.0 - beta_value) * float(args.strategic_scenarios)
+    if tail_scenarios < 2.0:
+        print(
+            f"[warning] beta={beta_value:g} over {args.strategic_scenarios} "
+            f"strategic scenarios resolves a tail of only {tail_scenarios:.1f} "
+            "scenarios; CVaR is averaging too few outcomes to be meaningful. "
+            f"Use at least {int(math.ceil(2.0 / (1.0 - beta_value)))} strategic "
+            "scenarios at this beta.",
+            flush=True,
+        )
 
     locations = load_locations()
     graph = build_graph(locations)
@@ -473,6 +506,17 @@ def main() -> None:
         verbose=not args.quiet,
         workers=args.workers,
     )
+
+    # Run provenance: without it a parameter sweep writes summary files that
+    # cannot be told apart after the fact.
+    summary["run"] = {
+        "beta": beta_value,
+        "seed": seed,
+        "scenarios": scenario_count,
+        "strategic_scenarios": args.strategic_scenarios,
+        "alpha": args.alpha,
+        "tail_scenarios_resolved": tail_scenarios,
+    }
 
     os.makedirs(args.output_dir, exist_ok=True)
     stamp = time.strftime("%Y%m%d_%H%M%S")

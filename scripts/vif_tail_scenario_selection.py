@@ -405,9 +405,20 @@ def select_tail_aware_scenarios(
 
 
 def _solve_relaxation(
-    instance: Dict[str, Any], distance_buckets: int, time_limit: float, verbose: bool
+    instance: Dict[str, Any],
+    distance_buckets: int,
+    time_limit: float,
+    verbose: bool,
+    barrier_only: bool = False,
 ) -> Tuple[Dict[int, float], Dict[str, Any]]:
     print("[screen 1] all-scenario continuous relaxation", flush=True)
+    relaxation_params = _solver_params(time_limit)
+    if barrier_only:
+        # This screen consumes only the per-scenario loss values, which the
+        # barrier interior point already supplies.  Crossover exists to
+        # recover a basic solution nothing downstream reads, and on the
+        # all-scenario LP it dominates the runtime.
+        relaxation_params["Crossover"] = 0
     results = solve_stochastic_cvar(
         instance,
         vehicle_formulation="distance_state",
@@ -415,7 +426,7 @@ def _solve_relaxation(
         vif_solve_config={
             "distance_buckets": int(distance_buckets),
             "relax_fixed_families": ["p", "b", "n"],
-            "params": _solver_params(time_limit),
+            "params": relaxation_params,
         },
     )
     _require_solution(results, "all-scenario relaxation")
@@ -428,11 +439,22 @@ def _solve_relaxation(
     # to clustering: preserve the best CVaR (within numerical tolerance),
     # then minimize probability-weighted expected loss.
     cvar_expression = model.getObjective()
-    cvar_tolerance = max(1e-6, 1e-7 * max(1.0, abs(relaxed_cvar)))
+    # The 1e-7 relative band assumes the first pass returned an exact optimum,
+    # which crossover guarantees and a barrier interior point does not.  Under
+    # barrier-only the reported objective can sit marginally past what is
+    # actually attainable, which makes the band infeasible and the second pass
+    # dies with "numerical trouble".  Widen it to 1e-4 relative there: still
+    # preserves CVaR to within a hundredth of a percent, which is far tighter
+    # than anything the tie-break needs to distinguish.
+    relative_band = 1e-4 if barrier_only else 1e-7
+    cvar_tolerance = max(1e-6, relative_band * max(1.0, abs(relaxed_cvar)))
     model.addConstr(
         cvar_expression <= relaxed_cvar + cvar_tolerance,
         name="TailScreenPreserveRelaxedCVaR",
     )
+    if barrier_only:
+        # Gurobi's own recommendation for the numerical trouble this pass hit.
+        model.setParam("BarHomogeneous", 1)
     loss_variables = results["variables"]["loss"]
     model.setObjective(
         sum(
@@ -559,11 +581,12 @@ def run_tail_selection(
     mip_gap: float = 0.10,
     selection_only: bool = False,
     verbose: bool = True,
+    barrier_only: bool = False,
 ) -> Dict[str, Any]:
     """Run selection and optionally one strategic solve/full evaluation."""
     started = time.time()
     relaxed_losses, relaxation_summary = _solve_relaxation(
-        instance, distance_buckets, lp_time, verbose
+        instance, distance_buckets, lp_time, verbose, barrier_only=barrier_only
     )
     selection = select_tail_aware_scenarios(
         instance,
@@ -660,6 +683,15 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--alpha", type=float, default=1.0)
     parser.add_argument("--selection-only", action="store_true")
+    parser.add_argument(
+        "--barrier-only",
+        action="store_true",
+        help=(
+            "Skip crossover on the all-scenario relaxation. Only the "
+            "per-scenario loss values are consumed downstream, and the "
+            "barrier interior point supplies those."
+        ),
+    )
     parser.add_argument("--quiet", action="store_true")
     parser.add_argument(
         "--output-dir", default=os.path.join("output", "vif_tail_selection")
@@ -703,6 +735,7 @@ def main() -> None:
         mip_gap=args.mip_gap,
         selection_only=args.selection_only,
         verbose=not args.quiet,
+        barrier_only=args.barrier_only,
     )
 
     os.makedirs(args.output_dir, exist_ok=True)
