@@ -208,6 +208,19 @@ aggressive than the configured 5.0.
 
 ---
 
+## 2026-10-06 — Run controls and provenance in `vif_staged_solve.py` (uncommitted)
+
+**What the written documents need to say.**
+- Method/experiment section: β is now a run-time parameter (`--beta`), not only a config value. Any reported result must state β, seed, scenario count, and strategic-scenario count (now recorded in `summary["run"]`).
+- Stage 1A description: the "probability-ranked 50-scenario subset" is, with uniform probabilities, scenarios 0-49. Describe it as a fixed-index subset, or replace it with the tail-aware selector.
+- Risk-setting discussion: tail resolution is (1-β) x strategic scenarios. β=0.9 needs >=21 strategic scenarios, β=0.95 needs >=40. The script default of 3 gives a 0.3-scenario tail, so earlier default-strategic runs do not resolve a CVaR tail.
+- Subset renormalization raises effective β (worst-50-of-150 is approx CVaR 0.967); say so wherever a subset CVaR is reported.
+- Tail-aware selector (advisor): needs exact pass-1 optimum (crossover); the full relaxation did not finish in 20 min. `--barrier-only` (1e-4 band) is unverified.
+
+See `DECISIONS.md` for the evidence.
+
+---
+
 ## Open items — resolved neither in code nor in documentation
 
 These came out of the 2026-10-01 real-world audit and are **not yet addressed**.
