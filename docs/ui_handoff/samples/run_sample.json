@@ -1,0 +1,166 @@
+{
+  "schema_version": "0.1-draft",
+  "_note": "Hand-assembled from output/vif_staged_proxy/summary_20260929_101829.json and network/nodes.csv. Only fields the solver exports today appear; see 03_data_contract.md section 4 for what is missing.",
+  "run": {
+    "id": "proxy_20260929_101829",
+    "method": "all_scenario_strategic_proxy_then_detailed_routing",
+    "scenario_count": 20,
+    "status": "OPTIMAL",
+    "gap": 0.0,
+    "elapsed_seconds": 13.8,
+    "beta": null,
+    "seed": null,
+    "_provenance_note": "beta and seed were not recorded before the run-provenance change; null means unknown, not zero"
+  },
+  "objective": {
+    "value": 27897500981.36592,
+    "unit": "model cost units (unitless)"
+  },
+  "selected_sites": [
+    {
+      "id": 3,
+      "name": "Sapporo",
+      "country": "Japan",
+      "region": "East Asia",
+      "lat": 43.0618,
+      "lon": 141.3545,
+      "population": 1973395,
+      "hub_type": "regional",
+      "site_eligible": true,
+      "tier": "PPL-2"
+    },
+    {
+      "id": 38,
+      "name": "Singapore",
+      "country": "Singapore",
+      "region": "Southeast Asia",
+      "lat": 1.3521,
+      "lon": 103.8198,
+      "population": 5917600,
+      "hub_type": "regional",
+      "site_eligible": true,
+      "tier": "PPL-2"
+    },
+    {
+      "id": 46,
+      "name": "Seoul / Busan",
+      "country": "South Korea",
+      "region": "East Asia",
+      "lat": 35.1796,
+      "lon": 129.0756,
+      "population": 9416000,
+      "hub_type": "major",
+      "site_eligible": true,
+      "tier": "PPL-1"
+    }
+  ],
+  "basing": [
+    {
+      "vehicle_type": "C-130J",
+      "node_id": 46,
+      "node_name": "Seoul / Busan",
+      "count": 16
+    },
+    {
+      "vehicle_type": "C-17",
+      "node_id": 46,
+      "node_name": "Seoul / Busan",
+      "count": 12
+    },
+    {
+      "vehicle_type": "LCU-1700",
+      "node_id": 46,
+      "node_name": "Seoul / Busan",
+      "count": 8
+    },
+    {
+      "vehicle_type": "M1083",
+      "node_id": 3,
+      "node_name": "Sapporo",
+      "count": 60
+    }
+  ],
+  "scenario_losses": [
+    {
+      "scenario_id": 0,
+      "loss": 34799957435.23379
+    },
+    {
+      "scenario_id": 1,
+      "loss": 20995044527.498055
+    },
+    {
+      "scenario_id": 2,
+      "loss": 592954576.0598645
+    },
+    {
+      "scenario_id": 3,
+      "loss": 738559098.1172898
+    },
+    {
+      "scenario_id": 4,
+      "loss": 0.0
+    },
+    {
+      "scenario_id": 5,
+      "loss": 41832506.92565564
+    },
+    {
+      "scenario_id": 6,
+      "loss": 8129516380.6748
+    },
+    {
+      "scenario_id": 7,
+      "loss": 1613105035.595998
+    },
+    {
+      "scenario_id": 8,
+      "loss": 277021536.468744
+    },
+    {
+      "scenario_id": 9,
+      "loss": 0.0
+    },
+    {
+      "scenario_id": 10,
+      "loss": 5186001779.684483
+    },
+    {
+      "scenario_id": 11,
+      "loss": 9169608238.470661
+    },
+    {
+      "scenario_id": 12,
+      "loss": 1821767642.9685354
+    },
+    {
+      "scenario_id": 13,
+      "loss": 4220549689.508097
+    },
+    {
+      "scenario_id": 14,
+      "loss": 20510384800.291874
+    },
+    {
+      "scenario_id": 15,
+      "loss": 2407606050.1080923
+    },
+    {
+      "scenario_id": 16,
+      "loss": 203301647.71547586
+    },
+    {
+      "scenario_id": 17,
+      "loss": 1009759170.3701017
+    },
+    {
+      "scenario_id": 18,
+      "loss": 622020331.6523591
+    },
+    {
+      "scenario_id": 19,
+      "loss": 105530876.00133464
+    }
+  ],
+  "_nodes_note": "full payload lists all 50 nodes with the same fields as selected_sites"
+}

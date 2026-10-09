@@ -25,7 +25,7 @@ Sees the same screens plus the technical detail: solver gap, run provenance, par
 
 ## Constraints
 - Data is produced offline by Python scripts and delivered as files (JSON, CSV).
-- Network is built from `pacific_cities.csv` (41 cities across the Pacific); the data contract (doc 03, not yet written) will fix the exact node set.
+- Network is 50 nodes (`network/nodes.csv`) joined by 1,502 air, 236 sea, and 30 land arcs (`network/arcs_*.csv`). Earlier drafts cited `pacific_cities.csv` (41 cities); that file is the legacy city list, not the model's network.
 - Eight vehicle types: C-17, C-130J, LCU-1700, T-AKR, T-AKE, EPF, M1083, PLS.
 - Unclassified data only. No CUI in this repository.
 
