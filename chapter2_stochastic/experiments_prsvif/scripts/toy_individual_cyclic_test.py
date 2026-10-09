@@ -37,13 +37,13 @@ This script does two things, not just one:
      solve -- a solver that never chooses to exploit a hole in this specific
      toy instance is not proof the hole doesn't exist.
 
-Run: python scripts/toy_individual_cyclic_test.py   (from aps_usarpac/)
+Run: python experiments_prsvif/scripts/toy_individual_cyclic_test.py   (from chapter2_stochastic/)
 """
 import os
 import sys
 from collections import defaultdict
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from config.loader import load_parameters
 from model.model import solve_stochastic_cvar, _assign_individual_homes

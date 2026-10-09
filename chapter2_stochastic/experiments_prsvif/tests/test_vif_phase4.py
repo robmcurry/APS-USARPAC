@@ -35,13 +35,13 @@ resource_weight = {"food": 1.0}, c_l,ij = 0.1, EPSILON = 0.04, delta = 500,
 rho = 0.2. Node/arc/handling-capacity degradation data is set non-binding
 throughout (this file is about C10/C11, not Phase 3's mechanisms).
 
-Run: cd aps_usarpac && pytest tests/test_vif_phase4.py -v
+Run: cd chapter2_stochastic && pytest experiments_prsvif/tests/test_vif_phase4.py -v
 """
 
 import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 import pytest
 
@@ -182,7 +182,7 @@ def test_c10_distance_budget_makes_a_connected_node_unreachable():
 # pre-Phase-4 use), but a nonzero cut count isn't something this small
 # an instance reliably produces. This mirrors why model.py's OLD
 # individual-formulation callback needed a purpose-built opposition-driven
-# network (scripts/toy_individual_cyclic_test.py) to force a nonzero cut
+# network (experiments_prsvif/scripts/toy_individual_cyclic_test.py) to force a nonzero cut
 # count in the first place -- not a gap in this test, just a property of
 # problem scale. See PHASE4_NOTES.md.
 

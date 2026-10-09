@@ -37,12 +37,12 @@ Method:
      mode (vessel/aircraft/road-rating dependent), so this is reported as
      a range across that mode's arcs, not a single number.
 
-Run: python scripts/vehcap_diagnostic.py   (from aps_usarpac/)
+Run: python experiments_prsvif/scripts/vehcap_diagnostic.py   (from chapter2_stochastic/)
 """
 import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from collections import defaultdict
 

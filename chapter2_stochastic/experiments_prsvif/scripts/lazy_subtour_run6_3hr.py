@@ -43,7 +43,7 @@ import sys
 import threading
 import time
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from config.loader import load_parameters
 from network.network_builder import load_locations, build_graph
@@ -56,7 +56,7 @@ NODE_LOG_INTERVAL_SEC = 300.0  # 5 minutes
 N = 10
 SEED = 32
 BETA = 0.90
-OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "..", "output")
+OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "output")
 LOG_PATH = os.path.join(OUTPUT_DIR, "lazy_subtour_run6_3hr_N10_seed32_beta090.log")
 SUMMARY_PATH = os.path.join(OUTPUT_DIR, "lazy_subtour_run6_3hr_summary.txt")
 INCUMBENT_FLAG_PATH = os.path.join(OUTPUT_DIR, "_run6_3hr_incumbent_flag.txt")

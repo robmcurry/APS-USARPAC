@@ -16,7 +16,7 @@ adds three things for live monitoring and a durable record of the run:
   - a summary file written at the end with the same fields the earlier
     report used, so the run leaves something behind besides scrollback
 
-Run: python scripts/vif_phase5_mip_test_beta08_n30.py   (from aps_usarpac/)
+Run: python experiments_prsvif/scripts/vif_phase5_mip_test_beta08_n30.py   (from chapter2_stochastic/)
 """
 import json
 import os
@@ -25,7 +25,7 @@ import sys
 import threading
 import time
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 import gurobipy as gp
 
@@ -42,7 +42,7 @@ TIME_LIMIT_SEC = 60000  # 60 min bounded attempt -- no prior PRS-VIF MIP timing 
 MEM_SAMPLE_INTERVAL_SEC = 15
 
 RUN_TAG = time.strftime("%Y%m%d_%H%M%S")
-LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "output", "mip_runs")
+LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "output", "mip_runs")
 os.makedirs(LOG_DIR, exist_ok=True)
 GUROBI_LOG_PATH = os.path.join(LOG_DIR, f"gurobi_{RUN_TAG}.log")
 MEM_LOG_PATH = os.path.join(LOG_DIR, f"memory_{RUN_TAG}.csv")

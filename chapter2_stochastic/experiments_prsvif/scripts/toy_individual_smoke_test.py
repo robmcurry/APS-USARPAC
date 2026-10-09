@@ -11,13 +11,13 @@ This is NOT a locked regression check -- that remains
 scripts/check_aggregate_regression.py, which stays aggregate-only and is
 unaffected by this script.
 
-Run: python scripts/toy_individual_smoke_test.py   (from aps_usarpac/)
+Run: python experiments_prsvif/scripts/toy_individual_smoke_test.py   (from chapter2_stochastic/)
 """
 import os
 import sys
 from collections import Counter
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from config.loader import load_parameters
 from model.model import solve_stochastic_cvar

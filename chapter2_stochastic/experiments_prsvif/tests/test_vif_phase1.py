@@ -25,13 +25,13 @@ simple:
         solve_vif this phase (no degradation model yet), so it does
         not appear as a modeled quantity here.
 
-Run: cd aps_usarpac && pytest tests/test_vif_phase1.py -v
+Run: cd chapter2_stochastic && pytest experiments_prsvif/tests/test_vif_phase1.py -v
 """
 
 import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 import pytest
 

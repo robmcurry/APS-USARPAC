@@ -20,15 +20,15 @@ memory-cost data on this machine before deciding whether a full
 see PHASE5_NOTES.md for the timing this produced and the resulting
 recommendation.
 
-Run: python scripts/vif_phase5_structural_validation.py [num_scenarios]
-     (from aps_usarpac/)
+Run: python experiments_prsvif/scripts/vif_phase5_structural_validation.py [num_scenarios]
+     (from chapter2_stochastic/)
 """
 import os
 import re
 import sys
 import time
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from config.loader import load_parameters
 from model.input_builder import build_stochastic_instance

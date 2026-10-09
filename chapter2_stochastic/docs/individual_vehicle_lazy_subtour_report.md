@@ -327,15 +327,15 @@ The existing lazy-callback mechanism is already conceptually a Benders-style cut
 |---|---|
 | Core implementation | `model/model.py` |
 | Toy instance builder (F_k override) | `toy_vehicle_test.py` |
-| Smoke / departure / cyclic toy tests | `scripts/toy_individual_{smoke,fk2_departure,cyclic}_test.py` |
-| Staged real-network runner (Steps A/B/C + F_k=1 diagnostic) | `scripts/lazy_subtour_staged_run.py` |
+| Smoke / departure / cyclic toy tests | `experiments_prsvif/scripts/toy_individual_{smoke,fk2_departure,cyclic}_test.py` |
+| Staged real-network runner (Steps A/B/C + F_k=1 diagnostic) | `experiments_prsvif/scripts/lazy_subtour_staged_run.py` |
 | Aggregate regression guard | `scripts/check_aggregate_regression.py` |
 | Run 1 log | `output/lazy_subtour_stepA_N10_seed32.log` (pre-symmetry-break copy) |
 | Run 2 log (F_k=1) | `output/lazy_subtour_stepA_fk1diag_N10_seed32.log` |
 | Run 5 log + memory trace (3hr) | `output/_probe_stepA_mipfocus_3hr.log`, `_probe_stepA_mipfocus_3hr_memlog.csv` |
 | Run 6 log (β=0.90 isolation) | `output/lazy_subtour_stepA_beta090_N10_seed32.log` |
-| Run 7 runner + log (β=0.90 repeat, 45 min) | `scripts/lazy_subtour_run6_repeat.py`, `output/lazy_subtour_run6_repeat_N10_seed32_beta090.log`, `output/lazy_subtour_run6_repeat_summary.txt` |
-| Run 8 runner + log (β=0.90, 3 hr) | `scripts/lazy_subtour_run6_3hr.py`, `output/lazy_subtour_run6_3hr_N10_seed32_beta090.log`, `output/lazy_subtour_run6_3hr_summary.txt` |
+| Run 7 runner + log (β=0.90 repeat, 45 min) | `experiments_prsvif/scripts/lazy_subtour_run6_repeat.py`, `output/lazy_subtour_run6_repeat_N10_seed32_beta090.log`, `output/lazy_subtour_run6_repeat_summary.txt` |
+| Run 8 runner + log (β=0.90, 3 hr) | `experiments_prsvif/scripts/lazy_subtour_run6_3hr.py`, `output/lazy_subtour_run6_3hr_N10_seed32_beta090.log`, `output/lazy_subtour_run6_3hr_summary.txt` |
 | External memory watchdog (Run 8) | `scripts/memory_watchdog.py`, `output/_run6_3hr_memwatchdog.csv` |
 | Locked aggregate baseline | `output/baseline_aggregate_toy.json` |
 

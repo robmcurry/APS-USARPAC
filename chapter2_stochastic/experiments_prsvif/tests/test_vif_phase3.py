@@ -31,13 +31,13 @@ Shared conventions with test_vif_phase1.py/test_vif_phase2.py: R = {"food"},
 resource_weight = {"food": 1.0}, c_l,ij = 0.1, EPSILON = 0.04, delta = 500,
 rho = 0.2 (releasable_fraction = 0.8).
 
-Run: cd aps_usarpac && pytest tests/test_vif_phase3.py -v
+Run: cd chapter2_stochastic && pytest experiments_prsvif/tests/test_vif_phase3.py -v
 """
 
 import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 import pytest
 

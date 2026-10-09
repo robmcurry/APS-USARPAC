@@ -42,13 +42,13 @@ solver cross-check caught; see the git history / PHASE2_NOTES.md for that
 detail. Moral, restated for whoever reads this next: check hand arithmetic
 against a numeric run before trusting it in a docstring.
 
-Run: cd aps_usarpac && pytest tests/test_vif_phase2.py -v
+Run: cd chapter2_stochastic && pytest experiments_prsvif/tests/test_vif_phase2.py -v
 """
 
 import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 import pytest
 

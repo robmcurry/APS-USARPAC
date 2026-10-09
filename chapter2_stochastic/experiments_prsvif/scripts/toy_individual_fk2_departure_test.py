@@ -31,13 +31,13 @@ Method: solve the toy instance at F_k=2 (air_fleet_size=2) twice:
       _debug_skip_departure_single_node diagnostic flag
 and run the path-connectivity check on both.
 
-Run: python scripts/toy_individual_fk2_departure_test.py   (from aps_usarpac/)
+Run: python experiments_prsvif/scripts/toy_individual_fk2_departure_test.py   (from chapter2_stochastic/)
 """
 import os
 import sys
 from collections import defaultdict
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from config.loader import load_parameters
 from model.model import solve_stochastic_cvar, _assign_individual_homes

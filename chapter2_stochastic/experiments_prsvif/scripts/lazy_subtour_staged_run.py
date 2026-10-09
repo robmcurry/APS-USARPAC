@@ -23,7 +23,7 @@ post-solve path-reachability check (written fresh here, not reusing
 _build_subtour_callback's internal logic) confirming the solution is
 genuinely subtour-free.
 
-Run: python scripts/lazy_subtour_staged_run.py --step A   (from aps_usarpac/)
+Run: python experiments_prsvif/scripts/lazy_subtour_staged_run.py --step A   (from chapter2_stochastic/)
 """
 import argparse
 import os
@@ -33,7 +33,7 @@ import threading
 import time
 from collections import defaultdict
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from config.loader import load_parameters
 from network.network_builder import load_locations, build_graph
@@ -43,7 +43,7 @@ from model.model import solve_stochastic_cvar, _assign_individual_homes
 
 TIME_LIMIT_SEC = 2700.0  # 45 minutes
 AIR_INDIV_TYPES = ("C-17", "C-130J")
-OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "..", "output")
+OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "output")
 
 STEPS = {
     "A": dict(num_scenarios=10, seed=32, beta=0.5, diagnostic=True),
